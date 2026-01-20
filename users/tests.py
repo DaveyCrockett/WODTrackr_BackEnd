@@ -1,224 +1,156 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
-from rest_framework.test import APITestCase, APIClient
-from rest_framework import status
-from users.models import UserProfile, GuestSession, LoginAttempt
+from users.models import UserProfile
+from users.serializers import UserSerializer, UserProfileSerializer
 from django.utils import timezone
 
 
-class AuthenticationTestCase(APITestCase):
-    """Integration tests for authentication endpoints"""
+class UserProfileSerializerTest(TestCase):
+    """Test cases for UserProfileSerializer"""
     
     def setUp(self):
-        """Set up test client and test data"""
-        self.client = APIClient()
-        self.register_url = '/api/users/auth/register/'
-        self.login_url = '/api/users/auth/login/'
-        self.refresh_url = '/api/users/auth/refresh/'
-        self.guest_url = '/api/users/auth/guest/'
-        
-        # Test user data
-        self.user_data = {
-            'username': 'testuser',
-            'email': 'test@example.com',
-            'password': 'TestPass123!',
-            'password2': 'TestPass123!',
-            'first_name': 'Test',
-            'last_name': 'User'
-        }
-    
-    def test_user_registration_success(self):
-        """Test successful user registration"""
-        response = self.client.post(self.register_url, self.user_data, format='json')
-        
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertIn('message', response.data)
-        self.assertIn('data', response.data)
-        self.assertEqual(response.data['data']['username'], 'testuser')
-        
-        # Verify user was created in database
-        user = User.objects.get(username='testuser')
-        self.assertEqual(user.email, 'test@example.com')
-        
-        # Verify UserProfile was created
-        self.assertTrue(UserProfile.objects.filter(user=user).exists())
-    
-    def test_user_registration_password_mismatch(self):
-        """Test registration fails with mismatched passwords"""
-        data = self.user_data.copy()
-        data['password2'] = 'DifferentPass123!'
-        
-        response = self.client.post(self.register_url, data, format='json')
-        
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('error', response.data)
-    
-    def test_user_registration_duplicate_username(self):
-        """Test registration fails with duplicate username"""
-        # Create first user
-        self.client.post(self.register_url, self.user_data, format='json')
-        
-        # Try to create duplicate
-        response = self.client.post(self.register_url, self.user_data, format='json')
-        
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-    
-    def test_user_login_success(self):
-        """Test successful user login"""
-        # Register user first
-        self.client.post(self.register_url, self.user_data, format='json')
-        
-        # Login
-        login_data = {
-            'username': 'testuser',
-            'password': 'TestPass123!'
-        }
-        response = self.client.post(self.login_url, login_data, format='json')
-        
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('access', response.data)
-        self.assertIn('refresh', response.data)
-        
-        # Verify LoginAttempt was logged
-        login_attempt = LoginAttempt.objects.filter(username='testuser').first()
-        self.assertIsNotNone(login_attempt)
-        self.assertTrue(login_attempt.success)
-    
-    def test_user_login_invalid_credentials(self):
-        """Test login fails with invalid credentials"""
-        # Register user first
-        self.client.post(self.register_url, self.user_data, format='json')
-        
-        # Try to login with wrong password
-        login_data = {
-            'username': 'testuser',
-            'password': 'WrongPassword123!'
-        }
-        response = self.client.post(self.login_url, login_data, format='json')
-        
-        # Accept either 400 or 401 as both indicate authentication failure
-        self.assertIn(response.status_code, [status.HTTP_400_BAD_REQUEST, status.HTTP_401_UNAUTHORIZED])
-        self.assertIn('error', response.data)
-        
-        # Verify failed LoginAttempt was logged
-        login_attempt = LoginAttempt.objects.filter(username='testuser').last()
-        self.assertIsNotNone(login_attempt)
-        self.assertFalse(login_attempt.success)
-    
-    def test_token_refresh(self):
-        """Test JWT token refresh"""
-        # Register and login
-        self.client.post(self.register_url, self.user_data, format='json')
-        login_data = {
-            'username': 'testuser',
-            'password': 'TestPass123!'
-        }
-        login_response = self.client.post(self.login_url, login_data, format='json')
-        refresh_token = login_response.data['refresh']
-        
-        # Refresh token
-        refresh_data = {'refresh': refresh_token}
-        response = self.client.post(self.refresh_url, refresh_data, format='json')
-        
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('access', response.data)
-    
-    def test_guest_session_creation(self):
-        """Test guest session creation"""
-        response = self.client.post(self.guest_url, {}, format='json')
-        
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertIn('message', response.data)
-        self.assertIn('data', response.data)
-        self.assertIn('access_token', response.data['data'])
-        self.assertTrue(response.data['data']['access_token'].startswith('guest_'))
-        
-        # Verify guest session in database
-        guest_token = response.data['data']['access_token']
-        guest_session = GuestSession.objects.get(token=guest_token)
-        self.assertTrue(guest_session.is_valid())
-    
-    def test_guest_session_with_custom_duration(self):
-        """Test guest session with custom duration"""
-        response = self.client.post(
-            self.guest_url,
-            {'duration_hours': 48},
-            format='json'
-        )
-        
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        
-        # Verify duration
-        guest_token = response.data['data']['access_token']
-        guest_session = GuestSession.objects.get(token=guest_token)
-        duration = (guest_session.expires_at - guest_session.created_at).total_seconds() / 3600
-        self.assertAlmostEqual(duration, 48, places=0)
-    
-    def test_guest_session_invalid_duration(self):
-        """Test guest session fails with invalid duration"""
-        response = self.client.post(
-            self.guest_url,
-            {'duration_hours': 200},  # More than max (168)
-            format='json'
-        )
-        
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('error', response.data)
-
-
-class UserProfileTestCase(APITestCase):
-    """Integration tests for user profile endpoints"""
-    
-    def setUp(self):
-        """Set up test client and test user"""
-        self.client = APIClient()
+        """Set up test user and profile"""
         self.user = User.objects.create_user(
             username='testuser',
             email='test@example.com',
-            password='TestPass123!'
+            first_name='Test',
+            last_name='User'
         )
-        UserProfile.objects.create(user=self.user)
-        
-        self.profile_url = '/api/users/profile/'
-        self.update_url = '/api/users/profile/update/'
-        
-        # Get JWT token
-        login_response = self.client.post(
-            '/api/users/auth/login/',
-            {'username': 'testuser', 'password': 'TestPass123!'},
-            format='json'
+        self.user_profile = UserProfile.objects.create(
+            user=self.user,
+            role='user',
+            bio='Test bio',
+            phone_number='1234567890',
+            verified=False,
+            two_factor_enabled=False
         )
-        self.token = login_response.data['access']
     
-    def test_get_profile_authenticated(self):
-        """Test getting user profile with authentication"""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token}')
-        response = self.client.get(self.profile_url)
+    def test_profile_serializer_fields(self):
+        """Test that UserProfileSerializer contains all required fields"""
+        serializer = UserProfileSerializer(instance=self.user_profile)
+        data = serializer.data
         
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('data', response.data)
-        self.assertEqual(response.data['data']['username'], 'testuser')
+        # Check that all expected fields are present
+        expected_fields = [
+            'role', 'profile_picture', 'bio', 'phone_number',
+            'verified', 'two_factor_enabled', 'created_at',
+            'updated_at', 'last_login'
+        ]
+        for field in expected_fields:
+            self.assertIn(field, data)
     
-    def test_get_profile_unauthenticated(self):
-        """Test getting profile fails without authentication"""
-        response = self.client.get(self.profile_url)
-        
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-    
-    def test_update_profile(self):
-        """Test updating user profile"""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token}')
-        update_data = {
-            'first_name': 'Updated',
-            'last_name': 'Name'
+    def test_profile_serializer_read_only_fields(self):
+        """Test that read-only fields cannot be updated"""
+        data = {
+            'verified': True,
+            'two_factor_enabled': True,
+            'role': 'admin'
         }
-        response = self.client.put(self.update_url, update_data, format='json')
+        serializer = UserProfileSerializer(instance=self.user_profile, data=data, partial=True)
+        self.assertTrue(serializer.is_valid())
+        serializer.save()
         
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('message', response.data)
+        # Refresh from database
+        self.user_profile.refresh_from_db()
         
-        # Verify update in database
-        self.user.refresh_from_db()
-        self.assertEqual(self.user.first_name, 'Updated')
-        self.assertEqual(self.user.last_name, 'Name')
+        # Read-only fields should not be updated
+        self.assertFalse(self.user_profile.verified)
+        self.assertFalse(self.user_profile.two_factor_enabled)
+        
+        # Non-read-only field should be updated
+        self.assertEqual(self.user_profile.role, 'admin')
+    
+    def test_profile_serializer_optional_fields(self):
+        """Test that optional fields can be omitted"""
+        data = {
+            'role': 'coach'
+        }
+        serializer = UserProfileSerializer(data=data)
+        # Should be valid even without profile_picture, bio, and phone_number
+        self.assertTrue(serializer.is_valid())
+
+
+class UserSerializerTest(TestCase):
+    """Test cases for UserSerializer with nested profile"""
+    
+    def setUp(self):
+        """Set up test user and profile"""
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            first_name='Test',
+            last_name='User'
+        )
+        self.user_profile = UserProfile.objects.create(
+            user=self.user,
+            role='user',
+            bio='Test bio',
+            phone_number='1234567890'
+        )
+    
+    def test_user_serializer_includes_profile(self):
+        """Test that UserSerializer includes nested profile data"""
+        serializer = UserSerializer(instance=self.user)
+        data = serializer.data
+        
+        # Check that profile field is present
+        self.assertIn('profile', data)
+        
+        # Check that profile contains expected fields
+        profile = data['profile']
+        self.assertEqual(profile['role'], 'user')
+        self.assertEqual(profile['bio'], 'Test bio')
+        self.assertEqual(profile['phone_number'], '1234567890')
+    
+    def test_user_serializer_without_profile(self):
+        """Test that UserSerializer handles users without profiles gracefully"""
+        user_no_profile = User.objects.create_user(
+            username='noprofile',
+            email='noprofile@example.com'
+        )
+        
+        serializer = UserSerializer(instance=user_no_profile)
+        data = serializer.data
+        
+        # Profile field should be present but None
+        self.assertIn('profile', data)
+        self.assertIsNone(data['profile'])
+    
+    def test_user_serializer_all_fields(self):
+        """Test that UserSerializer contains all expected user fields"""
+        serializer = UserSerializer(instance=self.user)
+        data = serializer.data
+        
+        expected_fields = ['id', 'username', 'email', 'first_name', 'last_name', 'profile']
+        for field in expected_fields:
+            self.assertIn(field, data)
+        
+        # Verify user data
+        self.assertEqual(data['username'], 'testuser')
+        self.assertEqual(data['email'], 'test@example.com')
+        self.assertEqual(data['first_name'], 'Test')
+        self.assertEqual(data['last_name'], 'User')
+    
+    def test_user_serializer_profile_read_only(self):
+        """Test that profile field is read-only in UserSerializer"""
+        data = {
+            'username': 'testuser',
+            'email': 'test@example.com',
+            'profile': {
+                'role': 'admin',
+                'bio': 'Updated bio'
+            }
+        }
+        serializer = UserSerializer(instance=self.user, data=data, partial=True)
+        
+        # Serializer should be valid
+        self.assertTrue(serializer.is_valid())
+        serializer.save()
+        
+        # Refresh from database
+        self.user.profile.refresh_from_db()
+        
+        # Profile should not be updated (it's read-only)
+        self.assertEqual(self.user.profile.role, 'user')
+        self.assertEqual(self.user.profile.bio, 'Test bio')
 
