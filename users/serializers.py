@@ -2,13 +2,34 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import GuestSession
+from .models import GuestSession, UserProfile
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    """
+    Serializer for UserProfile model with proper field configurations.
+    """
+    class Meta:
+        model = UserProfile
+        fields = (
+            'role', 'profile_picture', 'bio', 'phone_number', 
+            'verified', 'two_factor_enabled', 'created_at', 
+            'updated_at', 'last_login'
+        )
+        read_only_fields = ('verified', 'two_factor_enabled', 'created_at', 'updated_at', 'last_login')
+        extra_kwargs = {
+            'profile_picture': {'required': False},
+            'bio': {'required': False},
+            'phone_number': {'required': False},
+        }
 
 
 class UserSerializer(serializers.ModelSerializer):
+    profile = UserProfileSerializer(read_only=True, required=False)
+    
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'profile')
 
 
 class RegisterSerializer(serializers.ModelSerializer):
