@@ -6,6 +6,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
+from django.utils import timezone
 from .serializers import RegisterSerializer, UserSerializer, CustomTokenObtainPairSerializer, GuestSessionSerializer
 from .models import GuestSession, LoginAttempt, UserProfile
 
@@ -38,7 +39,6 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             try:
                 user = User.objects.get(username=username)
                 profile, created = UserProfile.objects.get_or_create(user=user)
-                from django.utils import timezone
                 profile.last_login = timezone.now()
                 profile.save()
             except User.DoesNotExist:
@@ -74,7 +74,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             return Response(
                 {
                     'error': 'Authentication failed',
-                    'detail': str(e)
+                    'detail': 'An error occurred during authentication. Please try again.'
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
@@ -136,7 +136,7 @@ def create_guest_session(request):
         return Response(
             {
                 'error': 'Failed to create guest session',
-                'detail': str(e)
+                'detail': 'An error occurred while creating the guest session. Please try again.'
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -171,7 +171,7 @@ def register(request):
             return Response(
                 {
                     'error': 'Registration failed',
-                    'detail': str(e)
+                    'detail': 'An error occurred during registration. Please try again.'
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
@@ -203,7 +203,7 @@ def user_profile(request):
         return Response(
             {
                 'error': 'Failed to retrieve profile',
-                'detail': str(e)
+                'detail': 'An error occurred while retrieving your profile. Please try again.'
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -238,7 +238,7 @@ def update_profile(request):
         return Response(
             {
                 'error': 'Failed to update profile',
-                'detail': str(e)
+                'detail': 'An error occurred while updating your profile. Please try again.'
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
