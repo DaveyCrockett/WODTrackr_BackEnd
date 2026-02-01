@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import GuestSession, UserProfile
+from .models import GuestSession, UserProfile, UserPreference
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -24,12 +24,27 @@ class UserProfileSerializer(serializers.ModelSerializer):
         }
 
 
+class UserPreferenceSerializer(serializers.ModelSerializer):
+    """
+    Serializer for UserPreference model.
+    """
+    class Meta:
+        model = UserPreference
+        fields = (
+            'preferred_units', 'time_format', 'notifications_email', 'notifications_push',
+            'reminder_time', 'theme', 'timezone', 'locale', 'public_profile',
+            'default_rest_timer_seconds', 'metric_rounding', 'created_at', 'updated_at'
+        )
+        read_only_fields = ('created_at', 'updated_at')
+
+
 class UserSerializer(serializers.ModelSerializer):
     profile = UserProfileSerializer(read_only=True, required=False)
+    preferences = UserPreferenceSerializer(read_only=True, required=False)
     
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'profile')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'profile', 'preferences')
 
 
 class RegisterSerializer(serializers.ModelSerializer):

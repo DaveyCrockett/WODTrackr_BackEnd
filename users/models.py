@@ -65,6 +65,48 @@ class UserSession(models.Model):
         self.save()
 
 
+class UserPreference(models.Model):
+    """
+    Stores user preferences for UI, notifications, and defaults.
+    """
+    UNIT_CHOICES = [
+        ('lbs', 'Pounds'),
+        ('kg', 'Kilograms'),
+    ]
+
+    TIME_FORMAT_CHOICES = [
+        ('12h', '12-hour'),
+        ('24h', '24-hour'),
+    ]
+
+    THEME_CHOICES = [
+        ('system', 'System'),
+        ('light', 'Light'),
+        ('dark', 'Dark'),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='preferences')
+    preferred_units = models.CharField(max_length=3, choices=UNIT_CHOICES, default='lbs')
+    time_format = models.CharField(max_length=3, choices=TIME_FORMAT_CHOICES, default='12h')
+    notifications_email = models.BooleanField(default=True)
+    notifications_push = models.BooleanField(default=True)
+    reminder_time = models.TimeField(null=True, blank=True)
+    theme = models.CharField(max_length=10, choices=THEME_CHOICES, default='system')
+    timezone = models.CharField(max_length=64, default='UTC')
+    locale = models.CharField(max_length=16, default='en-US')
+    public_profile = models.BooleanField(default=True)
+    default_rest_timer_seconds = models.PositiveIntegerField(default=90)
+    metric_rounding = models.PositiveIntegerField(default=5)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"Preferences: {self.user.username}"
+
+
 class GuestSession(models.Model):
     """
     Represents a guest session token for unauthenticated users.
