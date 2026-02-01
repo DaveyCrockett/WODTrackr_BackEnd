@@ -7,7 +7,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.utils import timezone
-from .serializers import RegisterSerializer, UserSerializer, CustomTokenObtainPairSerializer, GuestSessionSerializer
+from .serializers import RegisterSerializer, UserSerializer, UserProfileSerializer, CustomTokenObtainPairSerializer, GuestSessionSerializer
 from .models import GuestSession, LoginAttempt, UserProfile
 
 
@@ -239,6 +239,41 @@ def update_profile(request):
             {
                 'error': 'Failed to update profile',
                 'detail': 'An error occurred while updating your profile. Please try again.'
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_profile_details(request):
+    """
+    Update current user profile details (bio, phone number, profile picture).
+    """
+    try:
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        serializer = UserProfileSerializer(profile, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    'message': 'Profile details updated successfully',
+                    'data': serializer.data
+                },
+                status=status.HTTP_200_OK
+            )
+        return Response(
+            {
+                'error': 'Invalid profile details data',
+                'detail': serializer.errors
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response(
+            {
+                'error': 'Failed to update profile details',
+                'detail': 'An error occurred while updating your profile details. Please try again.'
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

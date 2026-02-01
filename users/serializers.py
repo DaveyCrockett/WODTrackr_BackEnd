@@ -16,7 +16,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'verified', 'two_factor_enabled', 'created_at', 
             'updated_at', 'last_login'
         )
-        read_only_fields = ('verified', 'two_factor_enabled', 'created_at', 'updated_at', 'last_login')
+        read_only_fields = ('role', 'verified', 'two_factor_enabled', 'created_at', 'updated_at', 'last_login')
         extra_kwargs = {
             'profile_picture': {'required': False},
             'bio': {'required': False},

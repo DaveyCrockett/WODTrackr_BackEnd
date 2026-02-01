@@ -1,6 +1,6 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
-from .views import CustomTokenObtainPairView, register, user_profile, update_profile, create_guest_session
+from .views import CustomTokenObtainPairView, register, user_profile, update_profile, update_profile_details, create_guest_session
 
 urlpatterns = [
     path('auth/login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
@@ -9,4 +9,5 @@ urlpatterns = [
     path('auth/guest/', create_guest_session, name='create_guest_session'),
     path('profile/', user_profile, name='user_profile'),
     path('profile/update/', update_profile, name='update_profile'),
+    path('profile/update/details/', update_profile_details, name='update_profile_details'),
 ]
