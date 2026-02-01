@@ -17,7 +17,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+from .views import openapi_yaml, swagger_ui
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/users/', include('users.urls')),
+    path('api/wodtrackr/', include('wodtrackr.urls')),
+    path('api/openapi.yaml', openapi_yaml, name='openapi_yaml'),
+    path('api/docs/', swagger_ui, name='swagger_ui'),
 ]

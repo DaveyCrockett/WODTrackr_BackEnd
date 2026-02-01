@@ -7,6 +7,165 @@ All endpoints are prefixed with: `/api/users/`
 
 ---
 
+## Exercise Endpoints
+
+### Base URL
+All exercise endpoints are prefixed with: `/api/wodtrackr/`
+
+### OpenAPI/Swagger
+The exercise endpoints are documented in [openapi.yaml](openapi.yaml).
+
+---
+
+## Exercise: List / Create
+
+**Endpoint:** `GET /api/wodtrackr/exercises/`
+
+**Description:** List public exercises and any exercises created by the authenticated user.
+
+**Authentication:** Required (JWT)
+
+**Query Parameters (optional):**
+- `search` (string) - Search name, description, and primary muscle group
+- `category` (string) - One of: weightlifting, powerlifting, gymnastics, monostructural, accessory, mobility, other
+- `equipment` (string) - One of: bodyweight, barbell, dumbbell, kettlebell, medicine_ball, box, rig, rings, rope, rower, bike, ski_erg, assault_runner, jump_rope, sled, sandbag, pegboard, other
+- `muscle` (string) - Filter by primary muscle group
+- `is_public` (boolean)
+- `mine` (boolean) - When true, returns only exercises created by the authenticated user
+- `ordering` (string) - name, -name, created_at, -created_at, updated_at, -updated_at
+
+**Success Response (200 OK):**
+```json
+{
+    "data": [
+        {
+            "id": 1,
+            "name": "Back Squat",
+            "description": "",
+            "category": "weightlifting",
+            "equipment": "barbell",
+            "primary_muscle_group": "legs",
+            "is_public": true,
+            "created_by": 2,
+            "created_by_username": "coach",
+            "created_at": "2026-02-01T00:00:00Z",
+            "updated_at": "2026-02-01T00:00:00Z"
+        }
+    ]
+}
+```
+
+**Endpoint:** `POST /api/wodtrackr/exercises/`
+
+**Description:** Create a new exercise owned by the authenticated user.
+
+**Authentication:** Required (JWT)
+
+**Request Body:**
+```json
+{
+    "name": "Back Squat",
+    "description": "",
+    "category": "weightlifting",
+    "equipment": "barbell",
+    "primary_muscle_group": "legs",
+    "is_public": true
+}
+```
+
+**Success Response (201 Created):**
+```json
+{
+    "message": "Exercise created successfully",
+    "data": {
+        "id": 1,
+        "name": "Back Squat",
+        "description": "",
+        "category": "weightlifting",
+        "equipment": "barbell",
+        "primary_muscle_group": "legs",
+        "is_public": true,
+        "created_by": 2,
+        "created_by_username": "coach",
+        "created_at": "2026-02-01T00:00:00Z",
+        "updated_at": "2026-02-01T00:00:00Z"
+    }
+}
+```
+
+---
+
+## Exercise: Retrieve / Update / Delete
+
+**Endpoint:** `GET /api/wodtrackr/exercises/{exercise_id}/`
+
+**Description:** Retrieve a single exercise (public or owned).
+
+**Authentication:** Required (JWT)
+
+**Success Response (200 OK):**
+```json
+{
+    "data": {
+        "id": 1,
+        "name": "Back Squat",
+        "description": "",
+        "category": "weightlifting",
+        "equipment": "barbell",
+        "primary_muscle_group": "legs",
+        "is_public": true,
+        "created_by": 2,
+        "created_by_username": "coach",
+        "created_at": "2026-02-01T00:00:00Z",
+        "updated_at": "2026-02-01T00:00:00Z"
+    }
+}
+```
+
+**Endpoint:** `PUT /api/wodtrackr/exercises/{exercise_id}/`
+
+**Description:** Update an exercise (owner or admin only).
+
+**Authentication:** Required (JWT)
+
+**Request Body (partial allowed):**
+```json
+{
+    "description": "Updated description",
+    "is_public": false
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+    "message": "Exercise updated successfully",
+    "data": {
+        "id": 1,
+        "name": "Back Squat",
+        "description": "Updated description",
+        "category": "weightlifting",
+        "equipment": "barbell",
+        "primary_muscle_group": "legs",
+        "is_public": false,
+        "created_by": 2,
+        "created_by_username": "coach",
+        "created_at": "2026-02-01T00:00:00Z",
+        "updated_at": "2026-02-01T00:10:00Z"
+    }
+}
+```
+
+**Endpoint:** `DELETE /api/wodtrackr/exercises/{exercise_id}/`
+
+**Description:** Delete an exercise (owner or admin only).
+
+**Authentication:** Required (JWT)
+
+**Success Response (204 No Content)**
+
+---
+
 ## 1. User Registration
 
 **Endpoint:** `POST /api/users/auth/register/`

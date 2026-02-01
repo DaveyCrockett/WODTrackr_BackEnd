@@ -1,4 +1,6 @@
 from django.db import models
+from django.core.validators import MinLengthValidator
+from django.db.models.functions import Lower
 from django.contrib.auth.models import User
 
 
@@ -37,7 +39,11 @@ class Exercise(models.Model):
 		('other', 'Other'),
 	]
 
-	name = models.CharField(max_length=120, unique=True)
+	name = models.CharField(
+		max_length=120,
+		unique=True,
+		validators=[MinLengthValidator(2)]
+	)
 	description = models.TextField(blank=True)
 	category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
 	equipment = models.CharField(max_length=20, choices=EQUIPMENT_CHOICES, default='bodyweight')
@@ -49,6 +55,17 @@ class Exercise(models.Model):
 
 	class Meta:
 		ordering = ['name']
+		constraints = [
+			models.CheckConstraint(condition=~models.Q(name=''), name='exercise_name_not_blank'),
+			models.UniqueConstraint(Lower('name'), name='exercise_name_unique_ci'),
+		]
+		indexes = [
+			models.Index(fields=['name']),
+			models.Index(fields=['category']),
+			models.Index(fields=['equipment']),
+			models.Index(fields=['is_public']),
+			models.Index(fields=['created_by']),
+		]
 
 	def __str__(self):
 		return self.name
