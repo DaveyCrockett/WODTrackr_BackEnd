@@ -11,7 +11,7 @@ class UserProfile(models.Model):
     """
     ROLE_CHOICES = [
         ('user', 'Regular User'),
-        ('coach', 'Coach'),
+        # ('coach', 'Coach'),
         ('admin', 'Administrator'),
     ]
     
