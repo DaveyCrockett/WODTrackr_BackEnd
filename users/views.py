@@ -7,8 +7,8 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.utils import timezone
-from .serializers import RegisterSerializer, UserSerializer, UserProfileSerializer, CustomTokenObtainPairSerializer, GuestSessionSerializer
-from .models import GuestSession, LoginAttempt, UserProfile
+from .serializers import RegisterSerializer, UserSerializer, UserProfileSerializer, UserPreferenceSerializer, CustomTokenObtainPairSerializer, GuestSessionSerializer
+from .models import GuestSession, LoginAttempt, UserProfile, UserPreference
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -155,6 +155,8 @@ def register(request):
             user = serializer.save()
             # Create UserProfile for the new user
             UserProfile.objects.get_or_create(user=user)
+            # Create UserPreference for the new user
+            UserPreference.objects.get_or_create(user=user)
             
             return Response(
                 {
@@ -274,6 +276,66 @@ def update_profile_details(request):
             {
                 'error': 'Failed to update profile details',
                 'detail': 'An error occurred while updating your profile details. Please try again.'
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_preferences(request):
+    """
+    Get current user preferences.
+    """
+    try:
+        preferences, _ = UserPreference.objects.get_or_create(user=request.user)
+        serializer = UserPreferenceSerializer(preferences)
+        return Response(
+            {
+                'data': serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        return Response(
+            {
+                'error': 'Failed to retrieve preferences',
+                'detail': 'An error occurred while retrieving your preferences. Please try again.'
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_preferences(request):
+    """
+    Update current user preferences.
+    """
+    try:
+        preferences, _ = UserPreference.objects.get_or_create(user=request.user)
+        serializer = UserPreferenceSerializer(preferences, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    'message': 'Preferences updated successfully',
+                    'data': serializer.data
+                },
+                status=status.HTTP_200_OK
+            )
+        return Response(
+            {
+                'error': 'Invalid preferences data',
+                'detail': serializer.errors
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response(
+            {
+                'error': 'Failed to update preferences',
+                'detail': 'An error occurred while updating your preferences. Please try again.'
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

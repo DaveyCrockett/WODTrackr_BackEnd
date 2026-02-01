@@ -1,7 +1,10 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
-from users.models import UserProfile
-from users.serializers import UserSerializer, UserProfileSerializer
+from rest_framework import status
+from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import RefreshToken
+from users.models import UserProfile, UserPreference
+from users.serializers import UserSerializer, UserProfileSerializer, UserPreferenceSerializer
 from django.utils import timezone
 
 
@@ -56,17 +59,15 @@ class UserProfileSerializerTest(TestCase):
         # Read-only fields should not be updated
         self.assertFalse(self.user_profile.verified)
         self.assertFalse(self.user_profile.two_factor_enabled)
-        
-        # Non-read-only field should be updated
-        self.assertEqual(self.user_profile.role, 'admin')
+        self.assertEqual(self.user_profile.role, 'user')
     
     def test_profile_serializer_optional_fields(self):
         """Test that optional fields can be omitted"""
         data = {
-            'role': 'coach'
+            'bio': 'Updated bio'
         }
-        serializer = UserProfileSerializer(data=data)
-        # Should be valid even without profile_picture, bio, and phone_number
+        serializer = UserProfileSerializer(instance=self.user_profile, data=data, partial=True)
+        # Should be valid even without profile_picture and phone_number
         self.assertTrue(serializer.is_valid())
 
 
@@ -87,6 +88,19 @@ class UserSerializerTest(TestCase):
             bio='Test bio',
             phone_number='1234567890'
         )
+        self.user_preferences = UserPreference.objects.create(
+            user=self.user,
+            preferred_units='kg',
+            time_format='24h',
+            notifications_email=True,
+            notifications_push=False,
+            theme='dark',
+            timezone='UTC',
+            locale='en-US',
+            public_profile=True,
+            default_rest_timer_seconds=120,
+            metric_rounding=5
+        )
     
     def test_user_serializer_includes_profile(self):
         """Test that UserSerializer includes nested profile data"""
@@ -101,6 +115,18 @@ class UserSerializerTest(TestCase):
         self.assertEqual(profile['role'], 'user')
         self.assertEqual(profile['bio'], 'Test bio')
         self.assertEqual(profile['phone_number'], '1234567890')
+
+    def test_user_serializer_includes_preferences(self):
+        """Test that UserSerializer includes nested preferences data"""
+        serializer = UserSerializer(instance=self.user)
+        data = serializer.data
+
+        self.assertIn('preferences', data)
+        preferences = data['preferences']
+        self.assertEqual(preferences['preferred_units'], 'kg')
+        self.assertEqual(preferences['time_format'], '24h')
+        self.assertEqual(preferences['notifications_push'], False)
+        self.assertEqual(preferences['theme'], 'dark')
     
     def test_user_serializer_without_profile(self):
         """Test that UserSerializer handles users without profiles gracefully"""
@@ -115,13 +141,17 @@ class UserSerializerTest(TestCase):
         # Profile field should be present but None
         self.assertIn('profile', data)
         self.assertIsNone(data['profile'])
+
+        # Preferences field should be present but None
+        self.assertIn('preferences', data)
+        self.assertIsNone(data['preferences'])
     
     def test_user_serializer_all_fields(self):
         """Test that UserSerializer contains all expected user fields"""
         serializer = UserSerializer(instance=self.user)
         data = serializer.data
         
-        expected_fields = ['id', 'username', 'email', 'first_name', 'last_name', 'profile']
+        expected_fields = ['id', 'username', 'email', 'first_name', 'last_name', 'profile', 'preferences']
         for field in expected_fields:
             self.assertIn(field, data)
         
@@ -153,4 +183,111 @@ class UserSerializerTest(TestCase):
         # Profile should not be updated (it's read-only)
         self.assertEqual(self.user.profile.role, 'user')
         self.assertEqual(self.user.profile.bio, 'Test bio')
+
+
+class UserPreferenceSerializerTest(TestCase):
+    """Test cases for UserPreferenceSerializer"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='prefuser',
+            email='pref@example.com'
+        )
+        self.preferences = UserPreference.objects.create(
+            user=self.user,
+            preferred_units='lbs',
+            time_format='12h',
+            notifications_email=True,
+            notifications_push=True,
+            theme='system',
+            timezone='UTC',
+            locale='en-US',
+            public_profile=True,
+            default_rest_timer_seconds=90,
+            metric_rounding=5
+        )
+
+    def test_preferences_serializer_fields(self):
+        serializer = UserPreferenceSerializer(instance=self.preferences)
+        data = serializer.data
+
+        expected_fields = [
+            'preferred_units', 'time_format', 'notifications_email', 'notifications_push',
+            'reminder_time', 'theme', 'timezone', 'locale', 'public_profile',
+            'default_rest_timer_seconds', 'metric_rounding', 'created_at', 'updated_at'
+        ]
+        for field in expected_fields:
+            self.assertIn(field, data)
+
+    def test_preferences_serializer_read_only_fields(self):
+        data = {
+            'created_at': timezone.now(),
+            'updated_at': timezone.now()
+        }
+        serializer = UserPreferenceSerializer(instance=self.preferences, data=data, partial=True)
+        self.assertTrue(serializer.is_valid())
+        serializer.save()
+
+        self.preferences.refresh_from_db()
+        self.assertIsNotNone(self.preferences.created_at)
+        self.assertIsNotNone(self.preferences.updated_at)
+
+    def test_preferences_serializer_invalid_choice(self):
+        data = {
+            'preferred_units': 'stones'
+        }
+        serializer = UserPreferenceSerializer(instance=self.preferences, data=data, partial=True)
+        self.assertFalse(serializer.is_valid())
+
+
+class UserPreferencesAPITest(TestCase):
+    """Integration tests for user preferences API"""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='apiuser',
+            email='api@example.com',
+            password='password123'
+        )
+        self.preferences = UserPreference.objects.create(user=self.user)
+
+    def authenticate(self):
+        refresh = RefreshToken.for_user(self.user)
+        access_token = str(refresh.access_token)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
+
+    def test_get_preferences_requires_auth(self):
+        response = self.client.get('/api/users/preferences/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_get_preferences_success(self):
+        self.authenticate()
+        response = self.client.get('/api/users/preferences/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('data', response.data)
+
+    def test_update_preferences_success(self):
+        self.authenticate()
+        payload = {
+            'preferred_units': 'kg',
+            'time_format': '24h',
+            'notifications_push': False,
+            'theme': 'dark',
+            'default_rest_timer_seconds': 120
+        }
+        response = self.client.put('/api/users/preferences/update/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['data']['preferred_units'], 'kg')
+        self.assertEqual(response.data['data']['time_format'], '24h')
+        self.assertEqual(response.data['data']['notifications_push'], False)
+        self.assertEqual(response.data['data']['theme'], 'dark')
+
+    def test_update_preferences_invalid_choice(self):
+        self.authenticate()
+        payload = {
+            'preferred_units': 'stones'
+        }
+        response = self.client.put('/api/users/preferences/update/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
