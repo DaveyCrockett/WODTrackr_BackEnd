@@ -166,6 +166,310 @@ The exercise endpoints are documented in [openapi.yaml](openapi.yaml).
 
 ---
 
+## Custom Exercise Endpoints
+
+### Base URL
+All custom exercise endpoints are prefixed with: `/api/wodtrackr/`
+
+---
+
+## Custom Exercise: List / Create
+
+**Endpoint:** `GET /api/wodtrackr/custom-exercises/`
+
+**Description:** List custom exercises created by the authenticated user (admins see all).
+
+**Authentication:** Required (JWT)
+
+**Query Parameters (optional):**
+- `search` (string) - Search title, description, and primary muscle group
+- `category` (string) - One of: weightlifting, powerlifting, gymnastics, monostructural, accessory, mobility, other
+- `equipment` (string) - One of: bodyweight, barbell, dumbbell, kettlebell, medicine_ball, box, rig, rings, rope, rower, bike, ski_erg, assault_runner, jump_rope, sled, sandbag, pegboard, other
+- `muscle` (string) - Filter by primary muscle group
+- `created_by` (integer) - Filter by creator user ID (admin only)
+- `created_from` (datetime) - ISO 8601 start time filter
+- `created_to` (datetime) - ISO 8601 end time filter
+- `updated_from` (datetime) - ISO 8601 start time filter
+- `updated_to` (datetime) - ISO 8601 end time filter
+- `ordering` (string) - title, -title, created_at, -created_at, updated_at, -updated_at
+
+**Success Response (200 OK):**
+```json
+{
+    "data": [
+        {
+            "id": 1,
+            "title": "Tempo Front Squat",
+            "description": "3s down, 1s pause",
+            "category": "weightlifting",
+            "equipment": "barbell",
+            "primary_muscle_group": "legs",
+            "created_by": 2,
+            "created_by_username": "coach",
+            "created_at": "2026-02-01T00:00:00Z",
+            "updated_at": "2026-02-01T00:00:00Z"
+        }
+    ]
+}
+```
+
+**Endpoint:** `POST /api/wodtrackr/custom-exercises/`
+
+**Description:** Create a new custom exercise owned by the authenticated user.
+
+**Authentication:** Required (JWT)
+
+**Request Body:**
+```json
+{
+    "title": "Tempo Front Squat",
+    "description": "3s down, 1s pause",
+    "category": "weightlifting",
+    "equipment": "barbell",
+    "primary_muscle_group": "legs"
+}
+```
+
+**Success Response (201 Created):**
+```json
+{
+    "message": "Custom exercise created successfully",
+    "data": {
+        "id": 1,
+        "title": "Tempo Front Squat",
+        "description": "3s down, 1s pause",
+        "category": "weightlifting",
+        "equipment": "barbell",
+        "primary_muscle_group": "legs",
+        "created_by": 2,
+        "created_by_username": "coach",
+        "created_at": "2026-02-01T00:00:00Z",
+        "updated_at": "2026-02-01T00:00:00Z"
+    }
+}
+```
+
+---
+
+## Custom Exercise: Retrieve / Update / Delete
+
+**Endpoint:** `GET /api/wodtrackr/custom-exercises/{custom_exercise_id}/`
+
+**Description:** Retrieve a single custom exercise (owner or admin only).
+
+**Authentication:** Required (JWT)
+
+**Success Response (200 OK):**
+```json
+{
+    "data": {
+        "id": 1,
+        "title": "Tempo Front Squat",
+        "description": "3s down, 1s pause",
+        "category": "weightlifting",
+        "equipment": "barbell",
+        "primary_muscle_group": "legs",
+        "created_by": 2,
+        "created_by_username": "coach",
+        "created_at": "2026-02-01T00:00:00Z",
+        "updated_at": "2026-02-01T00:00:00Z"
+    }
+}
+```
+
+**Endpoint:** `PUT /api/wodtrackr/custom-exercises/{custom_exercise_id}/`
+
+**Description:** Update a custom exercise (owner or admin only).
+
+**Authentication:** Required (JWT)
+
+**Request Body (partial allowed):**
+```json
+{
+    "description": "Updated description"
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+    "message": "Custom exercise updated successfully",
+    "data": {
+        "id": 1,
+        "title": "Tempo Front Squat",
+        "description": "Updated description",
+        "category": "weightlifting",
+        "equipment": "barbell",
+        "primary_muscle_group": "legs",
+        "created_by": 2,
+        "created_by_username": "coach",
+        "created_at": "2026-02-01T00:00:00Z",
+        "updated_at": "2026-02-01T00:10:00Z"
+    }
+}
+```
+
+**Endpoint:** `DELETE /api/wodtrackr/custom-exercises/{custom_exercise_id}/`
+
+**Description:** Delete a custom exercise (owner or admin only).
+
+**Authentication:** Required (JWT)
+
+**Success Response (204 No Content)**
+
+---
+
+## Exercise Notes Endpoints
+
+### Base URL
+All exercise note endpoints are prefixed with: `/api/wodtrackr/`
+
+---
+
+## Exercise Notes: List / Create
+
+**Endpoint:** `GET /api/wodtrackr/exercise-notes/`
+
+**Description:** List exercise notes owned by the authenticated user (admins see all).
+
+**Authentication:** Required (JWT)
+
+**Query Parameters (optional):**
+- `exercise_id` (integer) - Filter by exercise ID
+- `custom_exercise_id` (integer) - Filter by custom exercise ID
+- `search` (string) - Search notes and related exercise titles
+- `user_id` (integer) - Filter by user ID (admin only)
+- `target` (string) - exercise or custom_exercise
+- `has_notes` (boolean) - When true, returns notes with non-empty content
+- `created_from` (datetime) - ISO 8601 start time filter
+- `created_to` (datetime) - ISO 8601 end time filter
+- `updated_from` (datetime) - ISO 8601 start time filter
+- `updated_to` (datetime) - ISO 8601 end time filter
+- `ordering` (string) - created_at, -created_at, updated_at, -updated_at
+
+**Success Response (200 OK):**
+```json
+{
+    "data": [
+        {
+            "id": 1,
+            "user": 2,
+            "user_username": "coach",
+            "exercise": 1,
+            "exercise_name": "Back Squat",
+            "custom_exercise": null,
+            "custom_exercise_title": null,
+            "notes": "Focus on bracing and drive",
+            "created_at": "2026-02-01T00:00:00Z",
+            "updated_at": "2026-02-01T00:00:00Z"
+        }
+    ]
+}
+```
+
+**Endpoint:** `POST /api/wodtrackr/exercise-notes/`
+
+**Description:** Create a new exercise note for either a public exercise or a custom exercise (exactly one target).
+
+**Authentication:** Required (JWT)
+
+**Request Body (provide exactly one target):**
+```json
+{
+    "exercise": 1,
+    "notes": "Focus on bracing and drive"
+}
+```
+
+**Success Response (201 Created):**
+```json
+{
+    "message": "Exercise note created successfully",
+    "data": {
+        "id": 1,
+        "user": 2,
+        "user_username": "coach",
+        "exercise": 1,
+        "exercise_name": "Back Squat",
+        "custom_exercise": null,
+        "custom_exercise_title": null,
+        "notes": "Focus on bracing and drive",
+        "created_at": "2026-02-01T00:00:00Z",
+        "updated_at": "2026-02-01T00:00:00Z"
+    }
+}
+```
+
+---
+
+## Exercise Notes: Retrieve / Update / Delete
+
+**Endpoint:** `GET /api/wodtrackr/exercise-notes/{note_id}/`
+
+**Description:** Retrieve a single exercise note (owner or admin only).
+
+**Authentication:** Required (JWT)
+
+**Success Response (200 OK):**
+```json
+{
+    "data": {
+        "id": 1,
+        "user": 2,
+        "user_username": "coach",
+        "exercise": 1,
+        "exercise_name": "Back Squat",
+        "custom_exercise": null,
+        "custom_exercise_title": null,
+        "notes": "Focus on bracing and drive",
+        "created_at": "2026-02-01T00:00:00Z",
+        "updated_at": "2026-02-01T00:00:00Z"
+    }
+}
+```
+
+**Endpoint:** `PUT /api/wodtrackr/exercise-notes/{note_id}/`
+
+**Description:** Update an exercise note (owner or admin only).
+
+**Authentication:** Required (JWT)
+
+**Request Body (partial allowed):**
+```json
+{
+    "notes": "Updated note"
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+    "message": "Exercise note updated successfully",
+    "data": {
+        "id": 1,
+        "user": 2,
+        "user_username": "coach",
+        "exercise": 1,
+        "exercise_name": "Back Squat",
+        "custom_exercise": null,
+        "custom_exercise_title": null,
+        "notes": "Updated note",
+        "created_at": "2026-02-01T00:00:00Z",
+        "updated_at": "2026-02-01T00:10:00Z"
+    }
+}
+```
+
+**Endpoint:** `DELETE /api/wodtrackr/exercise-notes/{note_id}/`
+
+**Description:** Delete an exercise note (owner or admin only).
+
+**Authentication:** Required (JWT)
+
+**Success Response (204 No Content)**
+
+---
+
 ## 1. User Registration
 
 **Endpoint:** `POST /api/users/auth/register/`

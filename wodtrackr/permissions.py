@@ -33,3 +33,61 @@ class ExercisePermission(BasePermission):
             return obj.is_public or obj.created_by == request.user
 
         return obj.created_by == request.user
+
+
+class CustomExercisePermission(BasePermission):
+    """
+    Permissions for CustomExercise endpoints.
+
+    - Auth required for all endpoints.
+    - Admins can manage any custom exercise.
+    - Users can manage only their own custom exercises.
+    """
+
+    def _role(self, user):
+        profile = getattr(user, 'profile', None)
+        if profile and getattr(profile, 'role', None):
+            return profile.role
+        return 'user'
+
+    def _is_admin(self, user):
+        return user.is_staff or self._role(user) == 'admin'
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        if self._is_admin(request.user):
+            return True
+        return obj.created_by == request.user
+
+
+class ExerciseNotePermission(BasePermission):
+    """
+    Permissions for ExerciseNote endpoints.
+
+    - Auth required for all endpoints.
+    - Admins can manage any note.
+    - Users can manage only their own notes.
+    """
+
+    def _role(self, user):
+        profile = getattr(user, 'profile', None)
+        if profile and getattr(profile, 'role', None):
+            return profile.role
+        return 'user'
+
+    def _is_admin(self, user):
+        return user.is_staff or self._role(user) == 'admin'
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        if self._is_admin(request.user):
+            return True
+        return obj.user == request.user

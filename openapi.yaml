@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: WODTrackr Backend API
   version: 1.0.0
-  description: OpenAPI documentation for WODTrackr exercise endpoints.
+  description: OpenAPI documentation for WODTrackr exercise, custom exercise, and exercise note endpoints.
 servers:
   - url: /api
 components:
@@ -90,6 +90,137 @@ components:
           type: string
         is_public:
           type: boolean
+    CustomExercise:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+        category:
+          type: string
+          enum: [weightlifting, powerlifting, gymnastics, monostructural, accessory, mobility, other]
+        equipment:
+          type: string
+          enum: [bodyweight, barbell, dumbbell, kettlebell, medicine_ball, box, rig, rings, rope, rower, bike, ski_erg, assault_runner, jump_rope, sled, sandbag, pegboard, other]
+        primary_muscle_group:
+          type: string
+          maxLength: 50
+        created_by:
+          type: integer
+        created_by_username:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - category
+        - equipment
+        - created_at
+        - updated_at
+    CustomExerciseCreateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [weightlifting, powerlifting, gymnastics, monostructural, accessory, mobility, other]
+        equipment:
+          type: string
+          enum: [bodyweight, barbell, dumbbell, kettlebell, medicine_ball, box, rig, rings, rope, rower, bike, ski_erg, assault_runner, jump_rope, sled, sandbag, pegboard, other]
+        primary_muscle_group:
+          type: string
+      required:
+        - title
+    CustomExerciseUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [weightlifting, powerlifting, gymnastics, monostructural, accessory, mobility, other]
+        equipment:
+          type: string
+          enum: [bodyweight, barbell, dumbbell, kettlebell, medicine_ball, box, rig, rings, rope, rower, bike, ski_erg, assault_runner, jump_rope, sled, sandbag, pegboard, other]
+        primary_muscle_group:
+          type: string
+    ExerciseNote:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        user:
+          type: integer
+        user_username:
+          type: string
+        exercise:
+          type: integer
+          nullable: true
+        exercise_name:
+          type: string
+          nullable: true
+        custom_exercise:
+          type: integer
+          nullable: true
+        custom_exercise_title:
+          type: string
+          nullable: true
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - user
+        - notes
+        - created_at
+        - updated_at
+    ExerciseNoteCreateRequest:
+      type: object
+      description: Provide exactly one of exercise or custom_exercise.
+      properties:
+        exercise:
+          type: integer
+          nullable: true
+        custom_exercise:
+          type: integer
+          nullable: true
+        notes:
+          type: string
+      required:
+        - notes
+    ExerciseNoteUpdateRequest:
+      type: object
+      description: Provide exactly one of exercise or custom_exercise if changing target.
+      properties:
+        exercise:
+          type: integer
+          nullable: true
+        custom_exercise:
+          type: integer
+          nullable: true
+        notes:
+          type: string
     ErrorResponse:
       type: object
       properties:
@@ -291,6 +422,472 @@ paths:
       parameters:
         - in: path
           name: exercise_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /wodtrackr/custom-exercises/:
+    get:
+      summary: List custom exercises
+      description: Returns custom exercises owned by the authenticated user (admins see all). Supports search, filtering, and ordering.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search across title, description, and primary_muscle_group.
+        - in: query
+          name: category
+          schema:
+            type: string
+            enum: [weightlifting, powerlifting, gymnastics, monostructural, accessory, mobility, other]
+        - in: query
+          name: equipment
+          schema:
+            type: string
+            enum: [bodyweight, barbell, dumbbell, kettlebell, medicine_ball, box, rig, rings, rope, rower, bike, ski_erg, assault_runner, jump_rope, sled, sandbag, pegboard, other]
+        - in: query
+          name: muscle
+          schema:
+            type: string
+          description: Filter by primary_muscle_group (contains).
+        - in: query
+          name: created_by
+          schema:
+            type: integer
+          description: Filter by creator user ID (admin only).
+        - in: query
+          name: created_from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: created_to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: updated_from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: updated_to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: ordering
+          schema:
+            type: string
+            enum: [title, -title, created_at, -created_at, updated_at, -updated_at]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CustomExercise'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Create custom exercise
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomExerciseCreateRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/CustomExercise'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /wodtrackr/custom-exercises/{custom_exercise_id}/:
+    get:
+      summary: Retrieve custom exercise
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: custom_exercise_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/CustomExercise'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      summary: Update custom exercise
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: custom_exercise_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomExerciseUpdateRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/CustomExercise'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Delete custom exercise
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: custom_exercise_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /wodtrackr/exercise-notes/:
+    get:
+      summary: List exercise notes
+      description: Returns notes owned by the authenticated user (admins see all). Filter by exercise_id or custom_exercise_id.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: exercise_id
+          schema:
+            type: integer
+        - in: query
+          name: custom_exercise_id
+          schema:
+            type: integer
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search notes and related exercise titles.
+        - in: query
+          name: user_id
+          schema:
+            type: integer
+          description: Filter by user ID (admin only).
+        - in: query
+          name: target
+          schema:
+            type: string
+            enum: [exercise, custom_exercise]
+          description: Filter by target type.
+        - in: query
+          name: has_notes
+          schema:
+            type: boolean
+          description: When true, returns notes with non-empty content.
+        - in: query
+          name: created_from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: created_to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: updated_from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: updated_to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: ordering
+          schema:
+            type: string
+            enum: [created_at, -created_at, updated_at, -updated_at]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExerciseNote'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Create exercise note
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExerciseNoteCreateRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/ExerciseNote'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /wodtrackr/exercise-notes/{note_id}/:
+    get:
+      summary: Retrieve exercise note
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: note_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ExerciseNote'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      summary: Update exercise note
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: note_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExerciseNoteUpdateRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/ExerciseNote'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Delete exercise note
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: note_id
           required: true
           schema:
             type: integer
