@@ -4,11 +4,13 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+import uuid
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.utils import timezone
+from datetime import timedelta
 from .serializers import RegisterSerializer, UserSerializer, UserProfileSerializer, UserPreferenceSerializer, CustomTokenObtainPairSerializer, GuestSessionSerializer
-from .models import GuestSession, LoginAttempt, UserProfile, UserPreference
+from .models import GuestSession, LoginAttempt, UserProfile, UserPreference, RememberMeToken
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -22,6 +24,15 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         ip_address = request.META.get('REMOTE_ADDR', '0.0.0.0')
         user_agent = request.META.get('HTTP_USER_AGENT', '')
         username = request.data.get('username', '')
+        remember_me_raw = request.data.get('remember_me', False)
+        remember_me = False
+
+        if isinstance(remember_me_raw, bool):
+            remember_me = remember_me_raw
+        elif isinstance(remember_me_raw, str):
+            remember_me = remember_me_raw.strip().lower() in ('1', 'true', 'yes', 'on')
+        elif isinstance(remember_me_raw, int):
+            remember_me = remember_me_raw == 1
         
         try:
             # Attempt authentication
@@ -41,6 +52,17 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 profile, created = UserProfile.objects.get_or_create(user=user)
                 profile.last_login = timezone.now()
                 profile.save()
+
+                if remember_me:
+                    remember_token = RememberMeToken.objects.create(
+                        user=user,
+                        token=str(uuid.uuid4()),
+                        ip_address=ip_address if ip_address != '0.0.0.0' else None,
+                        user_agent=user_agent,
+                        expires_at=timezone.now() + timedelta(days=30)
+                    )
+                    response.data['remember_me_token'] = remember_token.token
+                    response.data['remember_me_expires_at'] = remember_token.expires_at
             except User.DoesNotExist:
                 pass
             

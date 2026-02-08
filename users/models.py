@@ -65,6 +65,35 @@ class UserSession(models.Model):
         self.save()
 
 
+class RememberMeToken(models.Model):
+    """
+    Persistent login token for "remember me" sessions per device.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='remember_me_tokens')
+    token = models.CharField(max_length=255, unique=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name_plural = "Remember Me Tokens"
+
+    def __str__(self):
+        return f"RememberMe: {self.user.username} - {self.created_at.isoformat()}"
+
+    def is_valid(self):
+        """Check if remember-me token is still active and not expired"""
+        return self.is_active and timezone.now() < self.expires_at
+
+    def revoke(self):
+        """Revoke this remember-me token"""
+        self.is_active = False
+        self.save()
+
+
 class UserPreference(models.Model):
     """
     Stores user preferences for UI, notifications, and defaults.
