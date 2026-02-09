@@ -21,11 +21,21 @@ class ExercisePermission(BasePermission):
         return user.is_staff or self._role(user) == 'admin'
 
     def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
-            return False
-        return True
+        if request.method in SAFE_METHODS:
+            if request.user and request.user.is_authenticated:
+                return True
+            return hasattr(request, 'guest_session') and request.guest_session is not None
+        return request.user and request.user.is_authenticated
 
     def has_object_permission(self, request, view, obj):
+        if not request.user or not request.user.is_authenticated:
+            return (
+                request.method in SAFE_METHODS and
+                obj.is_public and
+                hasattr(request, 'guest_session') and
+                request.guest_session is not None
+            )
+
         if self._is_admin(request.user):
             return True
 

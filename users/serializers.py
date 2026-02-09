@@ -71,6 +71,12 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    remember_me = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):
+        attrs.pop('remember_me', None)
+        return super().validate(attrs)
+
     def get_token(cls, user):
         token = super().get_token(user)
         # Add custom claims

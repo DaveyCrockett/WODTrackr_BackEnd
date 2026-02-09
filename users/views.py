@@ -52,17 +52,22 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 profile, created = UserProfile.objects.get_or_create(user=user)
                 profile.last_login = timezone.now()
                 profile.save()
-
+                console.log(f"User '{username}' logged in successfully. Remember me: {remember_me}")
                 if remember_me:
-                    remember_token = RememberMeToken.objects.create(
-                        user=user,
-                        token=str(uuid.uuid4()),
-                        ip_address=ip_address if ip_address != '0.0.0.0' else None,
-                        user_agent=user_agent,
-                        expires_at=timezone.now() + timedelta(days=30)
-                    )
-                    response.data['remember_me_token'] = remember_token.token
-                    response.data['remember_me_expires_at'] = remember_token.expires_at
+                    try:
+                        remember_token = RememberMeToken.objects.create(
+                            user=user,
+                            token=str(uuid.uuid4()),
+                            ip_address=ip_address if ip_address != '0.0.0.0' else None,
+                            user_agent=user_agent,
+                            expires_at=timezone.now() + timedelta(days=30)
+                        )
+                        response.data['remember_me_token'] = remember_token.token
+                        response.data['remember_me_expires_at'] = remember_token.expires_at.isoformat()
+                    except Exception:
+                        # Do not block login if remember-me token creation fails.
+                        response.data['remember_me_token'] = None
+                        response.data['remember_me_expires_at'] = None
             except User.DoesNotExist:
                 pass
             
