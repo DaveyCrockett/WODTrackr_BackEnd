@@ -52,7 +52,6 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 profile, created = UserProfile.objects.get_or_create(user=user)
                 profile.last_login = timezone.now()
                 profile.save()
-                console.log(f"User '{username}' logged in successfully. Remember me: {remember_me}")
                 if remember_me:
                     try:
                         remember_token = RememberMeToken.objects.create(
