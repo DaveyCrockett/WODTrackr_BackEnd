@@ -158,6 +158,93 @@ class ExerciseAPITest(TestCase):
 		self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
 
+class GuestExerciseAccessTest(TestCase):
+	"""Guest token access tests for exercise endpoints."""
+
+	def setUp(self):
+		self.client = APIClient()
+		self.user = User.objects.create_user(
+			username='guest_owner',
+			email='guest_owner@example.com',
+			password='password123'
+		)
+		UserProfile.objects.create(user=self.user, role='user')
+
+		self.public_exercise = Exercise.objects.create(
+			name='Burpee',
+			category='gymnastics',
+			equipment='bodyweight',
+			primary_muscle_group='full_body',
+			is_public=True,
+			created_by=self.user
+		)
+		self.private_exercise = Exercise.objects.create(
+			name='Secret Lift',
+			category='weightlifting',
+			equipment='barbell',
+			primary_muscle_group='legs',
+			is_public=False,
+			created_by=self.user
+		)
+
+	def _guest_token(self):
+		response = self.client.post('/api/users/auth/guest/', {}, format='json')
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+		return response.data['data']['access_token']
+
+	def test_guest_list_public_only(self):
+		token = self._guest_token()
+		self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+		response = self.client.get('/api/wodtrackr/exercises/')
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		names = {item['name'] for item in response.data['data']}
+		self.assertIn('Burpee', names)
+		self.assertNotIn('Secret Lift', names)
+
+	def test_guest_detail_public_ok(self):
+		token = self._guest_token()
+		self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+		response = self.client.get(f'/api/wodtrackr/exercises/{self.public_exercise.id}/')
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data['data']['name'], 'Burpee')
+
+	def test_guest_detail_private_forbidden(self):
+		token = self._guest_token()
+		self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+		response = self.client.get(f'/api/wodtrackr/exercises/{self.private_exercise.id}/')
+		self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+	def test_guest_cannot_create_exercise(self):
+		token = self._guest_token()
+		self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+		payload = {
+			'name': 'Guest Created',
+			'category': 'gymnastics',
+			'equipment': 'bodyweight',
+			'primary_muscle_group': 'full_body',
+			'is_public': True
+		}
+		response = self.client.post('/api/wodtrackr/exercises/', payload, format='json')
+		self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+	def test_guest_invalid_token_rejected(self):
+		self.client.credentials(HTTP_AUTHORIZATION='Bearer guest_invalid')
+		response = self.client.get('/api/wodtrackr/exercises/')
+		self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+	def test_guest_custom_exercises_forbidden(self):
+		token = self._guest_token()
+		self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+		response = self.client.get('/api/wodtrackr/custom-exercises/')
+		self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+	def test_guest_exercise_notes_forbidden(self):
+		token = self._guest_token()
+		self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+		response = self.client.get('/api/wodtrackr/exercise-notes/')
+		self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
 class CustomExerciseAPITest(TestCase):
 	"""Integration tests for custom exercise API endpoints."""
 

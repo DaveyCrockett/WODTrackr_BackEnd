@@ -49,9 +49,12 @@ def exercises(request):
 	List exercises or create a new exercise.
 	"""
 	if request.method == 'GET':
-		queryset = Exercise.objects.filter(
-			Q(is_public=True) | Q(created_by=request.user)
-		)
+		if request.user and request.user.is_authenticated:
+			queryset = Exercise.objects.filter(
+				Q(is_public=True) | Q(created_by=request.user)
+			)
+		else:
+			queryset = Exercise.objects.filter(is_public=True)
 
 		search = request.query_params.get('search', '').strip()
 		category = request.query_params.get('category', '').strip()
@@ -93,7 +96,10 @@ def exercises(request):
 		if mine:
 			if mine.lower() in ['true', 'false']:
 				if mine.lower() == 'true':
-					queryset = queryset.filter(created_by=request.user)
+					if request.user and request.user.is_authenticated:
+						queryset = queryset.filter(created_by=request.user)
+					else:
+						queryset = queryset.none()
 				else:
 					queryset = queryset.filter(is_public=True)
 			else:
@@ -159,7 +165,11 @@ def exercise_detail(request, exercise_id):
 		)
 
 	if request.method == 'GET':
-		if not (exercise.is_public or _can_manage_exercise(request.user, exercise)):
+		if request.user and request.user.is_authenticated:
+			can_view = exercise.is_public or _can_manage_exercise(request.user, exercise)
+		else:
+			can_view = exercise.is_public
+		if not can_view:
 			return Response(
 				{'error': 'Forbidden'},
 				status=status.HTTP_403_FORBIDDEN

@@ -3,9 +3,10 @@ from django.contrib.auth.models import User
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
-from users.models import UserProfile, UserPreference
+from users.models import UserProfile, UserPreference, GuestSession
 from users.serializers import UserSerializer, UserProfileSerializer, UserPreferenceSerializer
 from django.utils import timezone
+from datetime import timedelta
 
 
 class UserProfileSerializerTest(TestCase):
@@ -290,4 +291,129 @@ class UserPreferencesAPITest(TestCase):
         }
         response = self.client.put('/api/users/preferences/update/', payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class AuthFlowAPITest(TestCase):
+    """End-to-end tests for common authentication flows and edge cases."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user_password = 'StrongPass123!'
+        self.user = User.objects.create_user(
+            username='authuser',
+            email='authuser@example.com',
+            password=self.user_password
+        )
+
+    def _login(self, payload=None):
+        if payload is None:
+            payload = {
+                'username': self.user.username,
+                'password': self.user_password
+            }
+        return self.client.post('/api/users/auth/login/', payload, format='json')
+
+    def test_register_success(self):
+        payload = {
+            'username': 'newuser',
+            'email': 'newuser@example.com',
+            'password': 'ComplexPass123!',
+            'password2': 'ComplexPass123!'
+        }
+        response = self.client.post('/api/users/auth/register/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['data']['username'], 'newuser')
+
+    def test_register_password_mismatch(self):
+        payload = {
+            'username': 'mismatchuser',
+            'email': 'mismatch@example.com',
+            'password': 'ComplexPass123!',
+            'password2': 'DifferentPass123!'
+        }
+        response = self.client.post('/api/users/auth/register/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('password', response.data['detail'])
+
+    def test_register_duplicate_username(self):
+        payload = {
+            'username': self.user.username,
+            'email': 'another@example.com',
+            'password': 'ComplexPass123!',
+            'password2': 'ComplexPass123!'
+        }
+        response = self.client.post('/api/users/auth/register/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('username', response.data['detail'])
+
+    def test_login_success(self):
+        response = self._login()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+        self.assertIn('refresh', response.data)
+
+    def test_login_invalid_credentials(self):
+        response = self._login({'username': self.user.username, 'password': 'WrongPass123!'})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data['error'], 'Invalid credentials')
+
+    def test_login_with_remember_me(self):
+        response = self._login({'username': self.user.username, 'password': self.user_password, 'remember_me': True})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('remember_me_token', response.data)
+        self.assertIn('remember_me_expires_at', response.data)
+        self.assertIsNotNone(response.data['remember_me_token'])
+
+    def test_refresh_token_success(self):
+        login_response = self._login()
+        refresh = login_response.data['refresh']
+        response = self.client.post('/api/users/auth/refresh/', {'refresh': refresh}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+
+    def test_refresh_token_invalid(self):
+        response = self.client.post('/api/users/auth/refresh/', {'refresh': 'badtoken'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_guest_session_created(self):
+        response = self.client.post('/api/users/auth/guest/', {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn('access_token', response.data['data'])
+        self.assertIn('expires_at', response.data['data'])
+
+    def test_guest_session_invalid_duration(self):
+        response = self.client.post('/api/users/auth/guest/', {'duration_hours': 500}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('duration', response.data['error'].lower())
+
+    def test_profile_requires_auth(self):
+        response = self.client.get('/api/users/profile/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_profile_success(self):
+        login_response = self._login()
+        access = login_response.data['access']
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
+        response = self.client.get('/api/users/profile/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['data']['username'], self.user.username)
+
+    def test_profile_denied_for_guest_token(self):
+        guest = GuestSession.create_session(duration_hours=24, user_agent='test-agent', ip_address='127.0.0.1')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {guest.token}')
+        response = self.client.get('/api/users/profile/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_profile_denied_for_invalid_guest_token(self):
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer guest_invalid')
+        response = self.client.get('/api/users/profile/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_profile_denied_for_expired_guest_token(self):
+        expired = GuestSession.create_session(duration_hours=1, user_agent='test-agent', ip_address='127.0.0.1')
+        expired.expires_at = timezone.now() - timedelta(hours=1)
+        expired.save()
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {expired.token}')
+        response = self.client.get('/api/users/profile/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 

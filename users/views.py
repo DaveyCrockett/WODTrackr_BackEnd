@@ -4,6 +4,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework.exceptions import AuthenticationFailed
 import uuid
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
@@ -72,7 +73,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             
             return response
             
-        except (InvalidToken, TokenError) as e:
+        except (InvalidToken, TokenError, AuthenticationFailed) as e:
             # Log failed login
             LoginAttempt.objects.create(
                 username=username,
