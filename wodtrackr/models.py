@@ -8,6 +8,18 @@ class Exercise(models.Model):
 	"""
 	Represents a single exercise definition.
 	"""
+	Primary_Muscle_Choices = [
+		('back', 'Back'),
+		('cardio', 'Cardio'),
+		('chest', 'Chest'),
+		('core', 'Core'),
+		('full_body', 'Full Body'),
+		('glutes', 'Glutes'),
+		('legs', 'Legs'),
+		('shoulders', 'Shoulders'),
+		('other', 'Other'),
+	]
+
 	CATEGORY_CHOICES = [
 		('weightlifting', 'Weightlifting'),
 		('powerlifting', 'Powerlifting'),
@@ -47,7 +59,7 @@ class Exercise(models.Model):
 	description = models.TextField(blank=True)
 	category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
 	equipment = models.CharField(max_length=20, choices=EQUIPMENT_CHOICES, default='bodyweight')
-	primary_muscle_group = models.CharField(max_length=50, blank=True)
+	primary_muscle_group = models.CharField(max_length=50, choices=Primary_Muscle_Choices, blank=True)
 	created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='exercises')
 	is_public = models.BooleanField(default=True)
 	created_at = models.DateTimeField(auto_now_add=True)
@@ -77,6 +89,7 @@ class CustomExercise(models.Model):
 	"""
 	CATEGORY_CHOICES = Exercise.CATEGORY_CHOICES
 	EQUIPMENT_CHOICES = Exercise.EQUIPMENT_CHOICES
+	Primary_Muscle_Choices = Exercise.Primary_Muscle_Choices
 
 	created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='custom_exercises')
 	title = models.CharField(
@@ -86,7 +99,7 @@ class CustomExercise(models.Model):
 	description = models.TextField(blank=True)
 	category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
 	equipment = models.CharField(max_length=20, choices=EQUIPMENT_CHOICES, default='bodyweight')
-	primary_muscle_group = models.CharField(max_length=50, blank=True)
+	primary_muscle_group = models.CharField(max_length=50, choices=Primary_Muscle_Choices, blank=True)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
 
