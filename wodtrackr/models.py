@@ -77,6 +77,10 @@ class Exercise(models.Model):
 			models.Index(fields=['equipment']),
 			models.Index(fields=['is_public']),
 			models.Index(fields=['created_by']),
+			models.Index(fields=['primary_muscle_group']),
+			models.Index(fields=['created_at']),
+			models.Index(fields=['updated_at']),
+			models.Index(fields=['created_by', 'is_public']),
 		]
 
 	def __str__(self):
@@ -92,7 +96,7 @@ class CustomExercise(models.Model):
 	Primary_Muscle_Choices = Exercise.Primary_Muscle_Choices
 
 	created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='custom_exercises')
-	title = models.CharField(
+	name = models.CharField(
 		max_length=120,
 		validators=[MinLengthValidator(2)]
 	)
@@ -104,20 +108,21 @@ class CustomExercise(models.Model):
 	updated_at = models.DateTimeField(auto_now=True)
 
 	class Meta:
-		ordering = ['title']
+		ordering = ['name']
 		constraints = [
-			models.CheckConstraint(condition=~models.Q(title=''), name='custom_exercise_title_not_blank'),
-			models.UniqueConstraint(Lower('title'), 'created_by', name='custom_exercise_title_unique_ci'),
+			models.CheckConstraint(condition=~models.Q(name=''), name='custom_exercise_name_not_blank'),
+			models.UniqueConstraint(Lower('name'), 'created_by', name='custom_exercise_name_unique_ci'),
 		]
 		indexes = [
-			models.Index(fields=['title']),
+			models.Index(fields=['name']),
 			models.Index(fields=['category']),
 			models.Index(fields=['equipment']),
 			models.Index(fields=['created_by']),
+			models.Index(fields=['primary_muscle_group']),
 		]
 
 	def __str__(self):
-		return f"{self.title} ({self.created_by.username})"
+		return f"{self.name} ({self.created_by.username})"
 
 
 class ExerciseNote(models.Model):
@@ -151,5 +156,5 @@ class ExerciseNote(models.Model):
 		]
 
 	def __str__(self):
-		target = self.exercise.name if self.exercise_id else self.custom_exercise.title
+		target = self.exercise.name if self.exercise_id else self.custom_exercise.name
 		return f"Notes: {self.user.username} - {target}"
