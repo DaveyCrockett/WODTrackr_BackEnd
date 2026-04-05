@@ -4,6 +4,7 @@ from django.db import IntegrityError
 from django.db.models import Q
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from .models import Exercise, CustomExercise, ExerciseNote
@@ -40,6 +41,19 @@ def _validate_date_param(value, field_name):
 			},
 			status=status.HTTP_400_BAD_REQUEST
 		)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def exercise_choices(request):
+	"""
+	Return available choices for exercise fields.
+	"""
+	return Response({
+		'category': [{'value': k, 'label': v} for k, v in Exercise.CATEGORY_CHOICES],
+		'equipment': [{'value': k, 'label': v} for k, v in Exercise.EQUIPMENT_CHOICES],
+		'primary_muscle_group': [{'value': k, 'label': v} for k, v in Exercise.Primary_Muscle_Choices],
+	}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET', 'POST'])
