@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: WODTrackr Backend API
   version: 1.0.0
-  description: OpenAPI documentation for WODTrackr exercise, custom exercise, and exercise note endpoints.
+  description: OpenAPI documentation for WODTrackr exercise, custom exercise, exercise note, and exercise program endpoints.
 servers:
   - url: /api
 components:
@@ -221,6 +221,172 @@ components:
           nullable: true
         notes:
           type: string
+    ExerciseProgramItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        exercise:
+          type: integer
+          nullable: true
+        exercise_name:
+          type: string
+          nullable: true
+        custom_exercise:
+          type: integer
+          nullable: true
+        custom_exercise_name:
+          type: string
+          nullable: true
+        position:
+          type: integer
+        notes:
+          type: string
+          nullable: true
+          maxLength: 2000
+        week:
+          type: string
+          nullable: true
+          maxLength: 50
+        day:
+          type: string
+          nullable: true
+          maxLength: 50
+        sets:
+          type: string
+          nullable: true
+          maxLength: 50
+        reps:
+          type: string
+          nullable: true
+          maxLength: 50
+        load:
+          type: string
+          nullable: true
+          maxLength: 50
+        rest_seconds:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - position
+        - created_at
+        - updated_at
+    ExerciseProgramItemRequest:
+      type: object
+      description: Provide exactly one of exercise or custom_exercise.
+      properties:
+        exercise:
+          type: integer
+          nullable: true
+        custom_exercise:
+          type: integer
+          nullable: true
+        position:
+          type: integer
+        notes:
+          type: string
+          nullable: true
+        week:
+          type: string
+          nullable: true
+        day:
+          type: string
+          nullable: true
+        sets:
+          type: string
+          nullable: true
+        reps:
+          type: string
+          nullable: true
+        load:
+          type: string
+          nullable: true
+        rest_seconds:
+          type: integer
+          nullable: true
+      required:
+        - position
+    ExerciseProgram:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+          nullable: true
+        is_public:
+          type: boolean
+        created_by:
+          type: integer
+        created_by_username:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExerciseProgramItem'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - is_public
+        - created_by
+        - items
+        - created_at
+        - updated_at
+    ExerciseProgramCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        description:
+          type: string
+          nullable: true
+          maxLength: 3000
+        is_public:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExerciseProgramItemRequest'
+      required:
+        - name
+    ExerciseProgramUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        description:
+          type: string
+          nullable: true
+          maxLength: 3000
+        is_public:
+          type: boolean
+        items:
+          type: array
+          description: Replaces all existing items when provided.
+          items:
+            $ref: '#/components/schemas/ExerciseProgramItemRequest'
     ErrorResponse:
       type: object
       properties:
@@ -902,6 +1068,265 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /wodtrackr/exercise-programs/:
+    get:
+      summary: List exercise programs
+      description: Returns public programs plus programs owned by the authenticated user. Supports search, filtering, and ordering.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search across name and description.
+        - in: query
+          name: is_public
+          schema:
+            type: boolean
+          description: Filter by visibility.
+        - in: query
+          name: mine
+          schema:
+            type: boolean
+          description: When true, returns only programs created by the authenticated user.
+        - in: query
+          name: created_by
+          schema:
+            type: integer
+          description: Filter by creator user ID (admin only).
+        - in: query
+          name: exercise_id
+          schema:
+            type: integer
+          description: Filter programs that contain the given exercise ID.
+        - in: query
+          name: custom_exercise_id
+          schema:
+            type: integer
+          description: Filter programs that contain the given custom exercise ID.
+        - in: query
+          name: ordering
+          schema:
+            type: string
+            enum: [name, -name, created_at, -created_at, updated_at, -updated_at]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExerciseProgram'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Create exercise program
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExerciseProgramCreateRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/ExerciseProgram'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /wodtrackr/exercise-programs/{program_id}/:
+    get:
+      summary: Retrieve exercise program
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: program_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ExerciseProgram'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      summary: Update exercise program
+      description: Replaces the program's fields. If items are provided, all existing items are replaced.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: program_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExerciseProgramUpdateRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/ExerciseProgram'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Delete exercise program
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: program_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /wodtrackr/exercise-programs/{program_id}/reuse/:
+    post:
+      summary: Reuse (clone) an exercise program
+      description: Clones a visible program (public or owned) into the authenticated user's library as a new private program. All items including week, day, sets, reps, load, and rest_seconds are copied.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: program_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '201':
+          description: Cloned program created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/ExerciseProgram'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden — program is not visible to the user
           content:
             application/json:
               schema:

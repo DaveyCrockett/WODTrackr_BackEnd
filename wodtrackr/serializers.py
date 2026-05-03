@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Exercise, CustomExercise, ExerciseNote
+from .models import Exercise, CustomExercise, ExerciseNote, ExerciseProgram, ExerciseProgramItem
 
 
 class ExerciseSerializer(serializers.ModelSerializer):
@@ -140,3 +140,156 @@ class ExerciseNoteSerializer(serializers.ModelSerializer):
             'updated_at',
         )
         read_only_fields = ('user', 'user_username', 'created_at', 'updated_at')
+
+
+class ExerciseProgramItemSerializer(serializers.ModelSerializer):
+    exercise_name = serializers.CharField(source='exercise.name', read_only=True)
+    custom_exercise_name = serializers.CharField(source='custom_exercise.name', read_only=True)
+    position = serializers.IntegerField(required=False, min_value=1)
+    week = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    day = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    sets = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    rest_seconds = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+
+    def validate_reps(self, value):
+        if value is None:
+            return value
+        cleaned = value.strip()
+        if len(cleaned) > 50:
+            raise serializers.ValidationError('Reps must be 50 characters or fewer.')
+        return cleaned
+
+    def validate_load(self, value):
+        if value is None:
+            return value
+        cleaned = value.strip()
+        if len(cleaned) > 50:
+            raise serializers.ValidationError('Load must be 50 characters or fewer.')
+        return cleaned
+
+    def validate_notes(self, value):
+        if value is None:
+            return value
+        cleaned = value.strip()
+        if len(cleaned) > 2000:
+            raise serializers.ValidationError('Notes must be 2000 characters or fewer.')
+        return cleaned
+
+    def validate(self, attrs):
+        exercise = attrs.get('exercise', getattr(self.instance, 'exercise', None))
+        custom_exercise = attrs.get('custom_exercise', getattr(self.instance, 'custom_exercise', None))
+
+        if (exercise is None and custom_exercise is None) or (exercise is not None and custom_exercise is not None):
+            raise serializers.ValidationError('Provide exactly one of exercise or custom_exercise.')
+
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+
+        if custom_exercise is not None:
+            if not (user and (user.is_staff or custom_exercise.created_by == user)):
+                raise serializers.ValidationError('Custom exercise not found.')
+
+        if exercise is not None:
+            if not (user and (exercise.is_public or exercise.created_by == user or user.is_staff)):
+                raise serializers.ValidationError('Exercise not found.')
+
+        return attrs
+
+    class Meta:
+        model = ExerciseProgramItem
+        fields = (
+            'id',
+            'exercise',
+            'exercise_name',
+            'custom_exercise',
+            'custom_exercise_name',
+            'position',
+            'week',
+            'day',
+            'sets',
+            'reps',
+            'load',
+            'rest_seconds',
+            'notes',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = ('created_at', 'updated_at')
+
+
+class ExerciseProgramSerializer(serializers.ModelSerializer):
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    items = ExerciseProgramItemSerializer(many=True, required=False)
+
+    def validate_name(self, value):
+        cleaned = value.strip()
+        if len(cleaned) < 2:
+            raise serializers.ValidationError('Name must be at least 2 characters long.')
+        if len(cleaned) > 120:
+            raise serializers.ValidationError('Name must be 120 characters or fewer.')
+        return cleaned
+
+    def validate_description(self, value):
+        if value is None:
+            return value
+        cleaned = value.strip()
+        if len(cleaned) > 3000:
+            raise serializers.ValidationError('Description must be 3000 characters or fewer.')
+        return cleaned
+
+    def validate_items(self, value):
+        normalized_positions = []
+        for index, item in enumerate(value, start=1):
+            position = item.get('position') or index
+            normalized_positions.append(position)
+
+        if len(normalized_positions) != len(set(normalized_positions)):
+            raise serializers.ValidationError('Item positions must be unique within a program.')
+
+        return value
+
+    def _prepare_items(self, items_data):
+        prepared_items = []
+        for index, item_data in enumerate(items_data, start=1):
+            prepared_item = dict(item_data)
+            prepared_item['position'] = prepared_item.get('position') or index
+            prepared_items.append(prepared_item)
+        return prepared_items
+
+    def _create_items(self, program, items_data):
+        for item_data in self._prepare_items(items_data):
+            ExerciseProgramItem.objects.create(program=program, **item_data)
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items', [])
+        program = ExerciseProgram.objects.create(**validated_data)
+        self._create_items(program, items_data)
+        return program
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if items_data is not None:
+            instance.items.all().delete()
+            self._create_items(instance, items_data)
+
+        return instance
+
+    class Meta:
+        model = ExerciseProgram
+        fields = (
+            'id',
+            'name',
+            'description',
+            'is_public',
+            'created_by',
+            'created_by_username',
+            'items',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = ('created_by', 'created_by_username', 'created_at', 'updated_at')

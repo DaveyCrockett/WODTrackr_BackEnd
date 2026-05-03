@@ -1,19 +1,36 @@
 from datetime import datetime
 
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from .models import Exercise, CustomExercise, ExerciseNote
-from .permissions import ExercisePermission, CustomExercisePermission, ExerciseNotePermission
-from .serializers import ExerciseSerializer, CustomExerciseSerializer, ExerciseNoteSerializer
+from .models import Exercise, CustomExercise, ExerciseNote, ExerciseProgram, ExerciseProgramItem
+from .permissions import ExercisePermission, CustomExercisePermission, ExerciseNotePermission, ExerciseProgramPermission
+from .serializers import ExerciseSerializer, CustomExerciseSerializer, ExerciseNoteSerializer, ExerciseProgramSerializer
 
 
 def _can_manage_exercise(user, exercise):
 	return user.is_staff or exercise.created_by == user
+
+
+def _can_manage_program(user, program):
+	return user.is_staff or program.created_by == user
+
+
+def _can_view_program(user, program):
+	return user.is_staff or program.is_public or program.created_by == user
+
+
+def _build_reused_program_name(user, base_name):
+	candidate = f'{base_name} Copy'
+	suffix = 2
+	while ExerciseProgram.objects.filter(created_by=user, name__iexact=candidate).exists():
+		candidate = f'{base_name} Copy {suffix}'
+		suffix += 1
+	return candidate
 
 
 def _validate_choice_param(value, allowed_values, field_name):
@@ -645,3 +662,263 @@ def exercise_note_detail(request, note_id):
 
 	note.delete()
 	return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([ExerciseProgramPermission])
+def exercise_programs(request):
+	"""
+	List exercise programs or create a new exercise program.
+	"""
+	if request.method == 'GET':
+		if request.user.is_staff:
+			queryset = ExerciseProgram.objects.all()
+		else:
+			queryset = ExerciseProgram.objects.filter(
+				Q(is_public=True) | Q(created_by=request.user)
+			)
+
+		queryset = queryset.select_related('created_by').prefetch_related('items__exercise', 'items__custom_exercise')
+
+		search = request.query_params.get('search', '').strip()
+		is_public = request.query_params.get('is_public', '').strip()
+		mine = request.query_params.get('mine', '').strip()
+		created_by = request.query_params.get('created_by', '').strip()
+		exercise_id = request.query_params.get('exercise_id', '').strip()
+		custom_exercise_id = request.query_params.get('custom_exercise_id', '').strip()
+		ordering = request.query_params.get('ordering', '').strip()
+
+		if search:
+			queryset = queryset.filter(Q(name__icontains=search) | Q(description__icontains=search))
+
+		if is_public:
+			if is_public.lower() in ['true', 'false']:
+				queryset = queryset.filter(is_public=is_public.lower() == 'true')
+			else:
+				return Response(
+					{
+						'error': 'Invalid query parameter',
+						'detail': {'is_public': ['Must be true or false.']}
+					},
+					status=status.HTTP_400_BAD_REQUEST
+				)
+
+		if mine:
+			if mine.lower() in ['true', 'false']:
+				if mine.lower() == 'true':
+					queryset = queryset.filter(created_by=request.user)
+				else:
+					queryset = queryset.exclude(created_by=request.user).filter(is_public=True)
+			else:
+				return Response(
+					{
+						'error': 'Invalid query parameter',
+						'detail': {'mine': ['Must be true or false.']}
+					},
+					status=status.HTTP_400_BAD_REQUEST
+				)
+
+		if created_by:
+			if not request.user.is_staff:
+				return Response(
+					{
+						'error': 'Invalid query parameter',
+						'detail': {'created_by': ['Forbidden.']}
+					},
+					status=status.HTTP_403_FORBIDDEN
+				)
+			try:
+				created_by_id = int(created_by)
+			except ValueError:
+				return Response(
+					{
+						'error': 'Invalid query parameter',
+						'detail': {'created_by': ['Must be an integer.']}
+					},
+					status=status.HTTP_400_BAD_REQUEST
+				)
+			queryset = queryset.filter(created_by_id=created_by_id)
+
+		if exercise_id and custom_exercise_id:
+			return Response(
+				{
+					'error': 'Invalid query parameter',
+					'detail': {'exercise_id': ['Provide either exercise_id or custom_exercise_id, not both.']}
+				},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+
+		if exercise_id:
+			try:
+				exercise_id_int = int(exercise_id)
+			except ValueError:
+				return Response(
+					{
+						'error': 'Invalid query parameter',
+						'detail': {'exercise_id': ['Must be an integer.']}
+					},
+					status=status.HTTP_400_BAD_REQUEST
+				)
+			queryset = queryset.filter(items__exercise_id=exercise_id_int)
+
+		if custom_exercise_id:
+			try:
+				custom_exercise_id_int = int(custom_exercise_id)
+			except ValueError:
+				return Response(
+					{
+						'error': 'Invalid query parameter',
+						'detail': {'custom_exercise_id': ['Must be an integer.']}
+					},
+					status=status.HTTP_400_BAD_REQUEST
+				)
+			queryset = queryset.filter(items__custom_exercise_id=custom_exercise_id_int)
+
+		allowed_ordering = ['name', '-name', 'created_at', '-created_at', 'updated_at', '-updated_at']
+		if ordering in allowed_ordering:
+			queryset = queryset.order_by(ordering)
+		else:
+			queryset = queryset.order_by('name')
+
+		queryset = queryset.distinct()
+
+		serializer = ExerciseProgramSerializer(queryset, many=True)
+		return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+
+	serializer = ExerciseProgramSerializer(data=request.data, context={'request': request})
+	if serializer.is_valid():
+		try:
+			with transaction.atomic():
+				program = serializer.save(created_by=request.user)
+			return Response(
+				{
+					'message': 'Exercise program created successfully',
+					'data': ExerciseProgramSerializer(program).data
+				},
+				status=status.HTTP_201_CREATED
+			)
+		except IntegrityError:
+			return Response(
+				{
+					'error': 'Invalid exercise program data',
+					'detail': {'name': ['An exercise program with this name already exists.']}
+				},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+	return Response(
+		{
+			'error': 'Invalid exercise program data',
+			'detail': serializer.errors
+		},
+		status=status.HTTP_400_BAD_REQUEST
+	)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([ExerciseProgramPermission])
+def exercise_program_detail(request, program_id):
+	"""
+	Retrieve, update, or delete an exercise program.
+	"""
+	try:
+		program = ExerciseProgram.objects.select_related('created_by').prefetch_related('items__exercise', 'items__custom_exercise').get(id=program_id)
+	except ExerciseProgram.DoesNotExist:
+		return Response(
+			{
+				'error': 'Exercise program not found'
+			},
+			status=status.HTTP_404_NOT_FOUND
+		)
+
+	if request.method == 'GET':
+		if not _can_view_program(request.user, program):
+			return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+		serializer = ExerciseProgramSerializer(program)
+		return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+
+	if not _can_manage_program(request.user, program):
+		return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+
+	if request.method == 'PUT':
+		serializer = ExerciseProgramSerializer(program, data=request.data, partial=True, context={'request': request})
+		if serializer.is_valid():
+			try:
+				with transaction.atomic():
+					serializer.save()
+				return Response(
+					{
+						'message': 'Exercise program updated successfully',
+						'data': serializer.data
+					},
+					status=status.HTTP_200_OK
+				)
+			except IntegrityError:
+				return Response(
+					{
+						'error': 'Invalid exercise program data',
+						'detail': {'name': ['An exercise program with this name already exists.']}
+					},
+					status=status.HTTP_400_BAD_REQUEST
+				)
+		return Response(
+			{
+				'error': 'Invalid exercise program data',
+				'detail': serializer.errors
+			},
+			status=status.HTTP_400_BAD_REQUEST
+		)
+
+	program.delete()
+	return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['POST'])
+@permission_classes([ExerciseProgramPermission])
+def exercise_program_reuse(request, program_id):
+	"""
+	Clone a visible program into the current user's library.
+	"""
+	try:
+		program = ExerciseProgram.objects.prefetch_related('items').get(id=program_id)
+	except ExerciseProgram.DoesNotExist:
+		return Response(
+			{
+				'error': 'Exercise program not found'
+			},
+			status=status.HTTP_404_NOT_FOUND
+		)
+
+	if not _can_view_program(request.user, program):
+		return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+
+	with transaction.atomic():
+		reused_program = ExerciseProgram.objects.create(
+			created_by=request.user,
+			name=_build_reused_program_name(request.user, program.name),
+			description=program.description,
+			is_public=False,
+		)
+		ExerciseProgramItem.objects.bulk_create([
+			ExerciseProgramItem(
+				program=reused_program,
+				exercise=item.exercise,
+				custom_exercise=item.custom_exercise,
+				position=item.position,
+				week=item.week,
+				day=item.day,
+				sets=item.sets,
+				reps=item.reps,
+				load=item.load,
+				rest_seconds=item.rest_seconds,
+				notes=item.notes,
+			)
+			for item in program.items.all().order_by('position', 'id')
+		])
+
+	return Response(
+		{
+			'message': 'Exercise program reused successfully',
+			'data': ExerciseProgramSerializer(reused_program).data
+		},
+		status=status.HTTP_201_CREATED
+	)

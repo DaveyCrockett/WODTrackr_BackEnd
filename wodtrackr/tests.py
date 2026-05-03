@@ -1,11 +1,12 @@
 from django.contrib.auth.models import User
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.models import UserProfile
-from .models import Exercise, CustomExercise, ExerciseNote
+from .models import Exercise, CustomExercise, ExerciseNote, ExerciseProgram, ExerciseProgramItem
 
 
 class ExerciseAPITest(TestCase):
@@ -517,7 +518,6 @@ class ExerciseNoteAPITest(TestCase):
 		payload = {'notes': 'No target'}
 		response = self.client.post('/api/wodtrackr/exercise-notes/', payload, format='json')
 		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
 	def test_create_note_invalid_both_targets(self):
 		self.authenticate(self.user)
 		payload = {
@@ -573,3 +573,256 @@ class ExerciseNoteAPITest(TestCase):
 		self.authenticate(self.user)
 		response = self.client.get('/api/wodtrackr/exercise-notes/?created_from=bad-date')
 		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ExerciseProgramModelTest(TestCase):
+	"""Model tests for exercise programs."""
+
+	def setUp(self):
+		self.user = User.objects.create_user(
+			username='program_user',
+			email='program_user@example.com',
+			password='password123'
+		)
+		self.exercise = Exercise.objects.create(
+			name='Thruster',
+			category='weightlifting',
+			equipment='barbell',
+			primary_muscle_group='legs',
+			is_public=True,
+			created_by=self.user
+		)
+		self.custom_exercise = CustomExercise.objects.create(
+			created_by=self.user,
+			name='Paused Thruster',
+			category='weightlifting',
+			equipment='barbell',
+			primary_muscle_group='legs'
+		)
+
+	def test_program_can_be_created_and_shared(self):
+		program = ExerciseProgram.objects.create(
+			created_by=self.user,
+			name='Strength Cycle',
+			description='Four-week barbell progression.',
+			is_public=True
+		)
+
+		self.assertEqual(program.created_by, self.user)
+		self.assertTrue(program.is_public)
+
+	def test_program_item_requires_single_target(self):
+		program = ExerciseProgram.objects.create(created_by=self.user, name='Open Prep')
+
+		with transaction.atomic():
+			with self.assertRaises(IntegrityError):
+				ExerciseProgramItem.objects.create(program=program, position=1)
+
+		with transaction.atomic():
+			with self.assertRaises(IntegrityError):
+				ExerciseProgramItem.objects.create(
+					program=program,
+					position=1,
+					exercise=self.exercise,
+					custom_exercise=self.custom_exercise
+				)
+
+	def test_program_item_position_must_be_unique_per_program(self):
+		program = ExerciseProgram.objects.create(created_by=self.user, name='Competition Prep')
+		ExerciseProgramItem.objects.create(program=program, position=1, exercise=self.exercise)
+
+		with transaction.atomic():
+			with self.assertRaises(IntegrityError):
+				ExerciseProgramItem.objects.create(program=program, position=1, custom_exercise=self.custom_exercise)
+
+
+class ExerciseProgramAPITest(TestCase):
+	"""Integration tests for exercise program endpoints."""
+
+	def setUp(self):
+		self.client = APIClient()
+
+		self.user = User.objects.create_user(
+			username='program_api_user',
+			email='program_api_user@example.com',
+			password='password123'
+		)
+		UserProfile.objects.create(user=self.user, role='user')
+
+		self.user2 = User.objects.create_user(
+			username='program_api_user2',
+			email='program_api_user2@example.com',
+			password='password123'
+		)
+		UserProfile.objects.create(user=self.user2, role='user')
+
+		self.admin = User.objects.create_user(
+			username='program_api_admin',
+			email='program_api_admin@example.com',
+			password='password123',
+			is_staff=True
+		)
+		UserProfile.objects.create(user=self.admin, role='admin')
+
+		self.public_exercise = Exercise.objects.create(
+			name='Deadlift',
+			category='powerlifting',
+			equipment='barbell',
+			primary_muscle_group='back',
+			is_public=True,
+			created_by=self.user
+		)
+
+		self.private_exercise = Exercise.objects.create(
+			name='Tempo Deadlift',
+			category='powerlifting',
+			equipment='barbell',
+			primary_muscle_group='back',
+			is_public=False,
+			created_by=self.user2
+		)
+
+		self.custom_exercise = CustomExercise.objects.create(
+			created_by=self.user,
+			name='Deficit Deadlift',
+			category='powerlifting',
+			equipment='barbell',
+			primary_muscle_group='back'
+		)
+
+		self.other_custom_exercise = CustomExercise.objects.create(
+			created_by=self.user2,
+			name='Paused Deadlift',
+			category='powerlifting',
+			equipment='barbell',
+			primary_muscle_group='back'
+		)
+
+		self.public_program = ExerciseProgram.objects.create(
+			created_by=self.user2,
+			name='Back Builder',
+			description='Posterior chain program.',
+			is_public=True
+		)
+		ExerciseProgramItem.objects.create(program=self.public_program, exercise=self.public_exercise, position=1)
+
+		self.private_program = ExerciseProgram.objects.create(
+			created_by=self.user2,
+			name='Private Builder',
+			description='Private work.',
+			is_public=False
+		)
+		ExerciseProgramItem.objects.create(program=self.private_program, exercise=self.private_exercise, position=1)
+
+		self.owned_program = ExerciseProgram.objects.create(
+			created_by=self.user,
+			name='My Pull Cycle',
+			description='My own cycle.',
+			is_public=False
+		)
+		ExerciseProgramItem.objects.create(program=self.owned_program, custom_exercise=self.custom_exercise, position=1)
+
+	def authenticate(self, user):
+		refresh = RefreshToken.for_user(user)
+		self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+
+	def test_list_includes_public_and_owned_programs(self):
+		self.authenticate(self.user)
+		response = self.client.get('/api/wodtrackr/exercise-programs/')
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		names = {item['name'] for item in response.data['data']}
+		self.assertIn('Back Builder', names)
+		self.assertIn('My Pull Cycle', names)
+		self.assertNotIn('Private Builder', names)
+
+	def test_create_program_with_items_success(self):
+		self.authenticate(self.user)
+		payload = {
+			'name': 'Open Prep',
+			'description': 'Competition prep block.',
+			'is_public': True,
+			'items': [
+				{'exercise': self.public_exercise.id, 'position': 1, 'week': 1, 'day': 1, 'sets': 5, 'reps': '3', 'load': '80%', 'rest_seconds': 120, 'notes': 'Heavy triples'},
+				{'custom_exercise': self.custom_exercise.id, 'position': 2, 'week': 1, 'day': 2, 'sets': 4, 'reps': '8', 'load': 'RPE 7', 'rest_seconds': 90, 'notes': 'Accessory volume'}
+			]
+		}
+		response = self.client.post('/api/wodtrackr/exercise-programs/', payload, format='json')
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+		self.assertEqual(len(response.data['data']['items']), 2)
+		self.assertEqual(response.data['data']['created_by'], self.user.id)
+		self.assertEqual(response.data['data']['items'][0]['week'], 1)
+		self.assertEqual(response.data['data']['items'][0]['day'], 1)
+		self.assertEqual(response.data['data']['items'][0]['sets'], 5)
+		self.assertEqual(response.data['data']['items'][0]['reps'], '3')
+		self.assertEqual(response.data['data']['items'][0]['load'], '80%')
+		self.assertEqual(response.data['data']['items'][0]['rest_seconds'], 120)
+
+	def test_create_program_rejects_inaccessible_targets(self):
+		self.authenticate(self.user)
+		payload = {
+			'name': 'Invalid Program',
+			'items': [
+				{'exercise': self.private_exercise.id, 'position': 1},
+				{'custom_exercise': self.other_custom_exercise.id, 'position': 2}
+			]
+		}
+		response = self.client.post('/api/wodtrackr/exercise-programs/', payload, format='json')
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+		self.assertIn('items', response.data['detail'])
+
+	def test_update_owned_program_replaces_items(self):
+		self.authenticate(self.user)
+		payload = {
+			'name': 'My Pull Cycle Updated',
+			'items': [
+				{'exercise': self.public_exercise.id, 'position': 1, 'week': 2, 'day': 3, 'sets': 1, 'reps': '1+', 'load': '90%', 'rest_seconds': 180, 'notes': 'Top set'}
+			]
+		}
+		response = self.client.put(f'/api/wodtrackr/exercise-programs/{self.owned_program.id}/', payload, format='json')
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data['data']['name'], 'My Pull Cycle Updated')
+		self.assertEqual(len(response.data['data']['items']), 1)
+		self.assertEqual(response.data['data']['items'][0]['exercise'], self.public_exercise.id)
+		self.assertEqual(response.data['data']['items'][0]['week'], 2)
+		self.assertEqual(response.data['data']['items'][0]['day'], 3)
+		self.assertEqual(response.data['data']['items'][0]['sets'], 1)
+		self.assertEqual(response.data['data']['items'][0]['reps'], '1+')
+		self.assertEqual(response.data['data']['items'][0]['load'], '90%')
+		self.assertEqual(response.data['data']['items'][0]['rest_seconds'], 180)
+
+	def test_list_filters_by_exercise_id(self):
+		self.authenticate(self.user)
+		response = self.client.get(f'/api/wodtrackr/exercise-programs/?exercise_id={self.public_exercise.id}')
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		names = {item['name'] for item in response.data['data']}
+		self.assertIn('Back Builder', names)
+		self.assertNotIn('My Pull Cycle', names)
+
+	def test_list_filters_by_custom_exercise_id(self):
+		self.authenticate(self.user)
+		response = self.client.get(f'/api/wodtrackr/exercise-programs/?custom_exercise_id={self.custom_exercise.id}')
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		names = {item['name'] for item in response.data['data']}
+		self.assertIn('My Pull Cycle', names)
+		self.assertNotIn('Back Builder', names)
+
+	def test_list_rejects_both_program_target_filters(self):
+		self.authenticate(self.user)
+		response = self.client.get(
+			f'/api/wodtrackr/exercise-programs/?exercise_id={self.public_exercise.id}&custom_exercise_id={self.custom_exercise.id}'
+		)
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+	def test_reuse_public_program_success(self):
+		self.authenticate(self.user)
+		response = self.client.post(f'/api/wodtrackr/exercise-programs/{self.public_program.id}/reuse/', {}, format='json')
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+		self.assertEqual(response.data['data']['created_by'], self.user.id)
+		self.assertFalse(response.data['data']['is_public'])
+		self.assertEqual(len(response.data['data']['items']), 1)
+		self.assertEqual(response.data['data']['items'][0]['exercise'], self.public_exercise.id)
+
+	def test_reuse_private_program_forbidden(self):
+		self.authenticate(self.user)
+		response = self.client.post(f'/api/wodtrackr/exercise-programs/{self.private_program.id}/reuse/', {}, format='json')
+		self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

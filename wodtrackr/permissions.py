@@ -101,3 +101,35 @@ class ExerciseNotePermission(BasePermission):
         if self._is_admin(request.user):
             return True
         return obj.user == request.user
+
+
+class ExerciseProgramPermission(BasePermission):
+    """
+    Permissions for ExerciseProgram endpoints.
+
+    - Auth required for all endpoints.
+    - Admins can manage any program.
+    - Users can read public programs or their own programs.
+    - Users can modify only their own programs.
+    """
+
+    def _role(self, user):
+        profile = getattr(user, 'profile', None)
+        if profile and getattr(profile, 'role', None):
+            return profile.role
+        return 'user'
+
+    def _is_admin(self, user):
+        return user.is_staff or self._role(user) == 'admin'
+
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        if self._is_admin(request.user):
+            return True
+
+        if request.method in SAFE_METHODS:
+            return obj.is_public or obj.created_by == request.user
+
+        return obj.created_by == request.user

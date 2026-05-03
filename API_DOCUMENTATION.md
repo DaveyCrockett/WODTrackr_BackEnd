@@ -786,6 +786,212 @@ This enables:
 
 ---
 
+## Exercise Program Endpoints
+
+### Base URL
+All exercise program endpoints are prefixed with: `/api/wodtrackr/`
+
+---
+
+## Exercise Program: List / Create
+
+**Endpoint:** `GET /api/wodtrackr/exercise-programs/`
+
+**Description:** List public exercise programs and any programs created by the authenticated user.
+
+**Authentication:** Required (JWT)
+
+**Query Parameters (optional):**
+- `search` (string) - Search program name and description
+- `is_public` (boolean)
+- `mine` (boolean) - When true, returns only programs created by the authenticated user
+- `exercise_id` (integer) - Filter programs containing a shared exercise
+- `custom_exercise_id` (integer) - Filter programs containing a custom exercise
+- `created_by` (integer) - Filter by creator user ID (admin only)
+- `ordering` (string) - name, -name, created_at, -created_at, updated_at, -updated_at
+
+**Success Response (200 OK):**
+```json
+{
+    "data": [
+        {
+            "id": 1,
+            "name": "Open Prep",
+            "description": "Competition prep block.",
+            "is_public": true,
+            "created_by": 2,
+            "created_by_username": "coach",
+            "items": [
+                {
+                    "id": 1,
+                    "exercise": 10,
+                    "exercise_name": "Deadlift",
+                    "custom_exercise": null,
+                    "custom_exercise_name": null,
+                    "position": 1,
+                    "week": 1,
+                    "day": 1,
+                    "sets": 5,
+                    "reps": "3",
+                    "load": "80%",
+                    "rest_seconds": 120,
+                    "notes": "Heavy triples",
+                    "created_at": "2026-05-03T00:00:00Z",
+                    "updated_at": "2026-05-03T00:00:00Z"
+                }
+            ],
+            "created_at": "2026-05-03T00:00:00Z",
+            "updated_at": "2026-05-03T00:00:00Z"
+        }
+    ]
+}
+```
+
+**Endpoint:** `POST /api/wodtrackr/exercise-programs/`
+
+**Description:** Create a new exercise program owned by the authenticated user.
+
+**Authentication:** Required (JWT)
+
+**Request Body:**
+```json
+{
+    "name": "Open Prep",
+    "description": "Competition prep block.",
+    "is_public": true,
+    "items": [
+        {
+            "exercise": 10,
+            "position": 1,
+            "week": 1,
+            "day": 1,
+            "sets": 5,
+            "reps": "3",
+            "load": "80%",
+            "rest_seconds": 120,
+            "notes": "Heavy triples"
+        },
+        {
+            "custom_exercise": 4,
+            "position": 2,
+            "week": 1,
+            "day": 2,
+            "sets": 4,
+            "reps": "8",
+            "load": "RPE 7",
+            "rest_seconds": 90,
+            "notes": "Accessory volume"
+        }
+    ]
+}
+```
+
+**Success Response (201 Created):**
+```json
+{
+    "message": "Exercise program created successfully",
+    "data": {
+        "id": 1,
+        "name": "Open Prep",
+        "description": "Competition prep block.",
+        "is_public": true,
+        "created_by": 2,
+        "created_by_username": "coach",
+        "items": [
+            {
+                "id": 1,
+                "exercise": 10,
+                "exercise_name": "Deadlift",
+                "custom_exercise": null,
+                "custom_exercise_name": null,
+                "position": 1,
+                "week": 1,
+                "day": 1,
+                "sets": 5,
+                "reps": "3",
+                "load": "80%",
+                "rest_seconds": 120,
+                "notes": "Heavy triples",
+                "created_at": "2026-05-03T00:00:00Z",
+                "updated_at": "2026-05-03T00:00:00Z"
+            }
+        ],
+        "created_at": "2026-05-03T00:00:00Z",
+        "updated_at": "2026-05-03T00:00:00Z"
+    }
+}
+```
+
+---
+
+## Exercise Program: Retrieve / Update / Delete
+
+**Endpoint:** `GET /api/wodtrackr/exercise-programs/{program_id}/`
+
+**Description:** Retrieve a public or owned program.
+
+**Authentication:** Required (JWT)
+
+**Endpoint:** `PUT /api/wodtrackr/exercise-programs/{program_id}/`
+
+**Description:** Update an exercise program and optionally replace its items.
+
+**Authentication:** Required (JWT)
+
+**Endpoint:** `DELETE /api/wodtrackr/exercise-programs/{program_id}/`
+
+**Description:** Delete an exercise program.
+
+**Authentication:** Required (JWT)
+
+---
+
+## Exercise Program: Reuse
+
+**Endpoint:** `POST /api/wodtrackr/exercise-programs/{program_id}/reuse/`
+
+**Description:** Clone a visible program into the authenticated user's library as a private copy.
+
+**Authentication:** Required (JWT)
+
+**Success Response (201 Created):**
+```json
+{
+    "message": "Exercise program reused successfully",
+    "data": {
+        "id": 7,
+        "name": "Open Prep Copy",
+        "description": "Competition prep block.",
+        "is_public": false,
+        "created_by": 3,
+        "created_by_username": "athlete",
+        "items": [
+            {
+                "id": 21,
+                "exercise": 10,
+                "exercise_name": "Deadlift",
+                "custom_exercise": null,
+                "custom_exercise_name": null,
+                "position": 1,
+                "week": 1,
+                "day": 1,
+                "sets": 5,
+                "reps": "3",
+                "load": "80%",
+                "rest_seconds": 120,
+                "notes": "Heavy triples",
+                "created_at": "2026-05-03T00:00:00Z",
+                "updated_at": "2026-05-03T00:00:00Z"
+            }
+        ],
+        "created_at": "2026-05-03T00:00:00Z",
+        "updated_at": "2026-05-03T00:00:00Z"
+    }
+}
+```
+
+---
+
 ## Development and Testing
 
 ### Seed Data Command

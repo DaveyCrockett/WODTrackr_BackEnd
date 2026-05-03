@@ -125,6 +125,83 @@ class CustomExercise(models.Model):
 		return f"{self.name} ({self.created_by.username})"
 
 
+class ExerciseProgram(models.Model):
+	"""
+	A reusable exercise program that can be private or shared with other users.
+	"""
+	created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='exercise_programs')
+	name = models.CharField(
+		max_length=120,
+		validators=[MinLengthValidator(2)]
+	)
+	description = models.TextField(blank=True)
+	is_public = models.BooleanField(default=False)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		ordering = ['name']
+		constraints = [
+			models.CheckConstraint(condition=~models.Q(name=''), name='exercise_program_name_not_blank'),
+			models.UniqueConstraint(Lower('name'), 'created_by', name='exercise_program_name_unique_ci'),
+		]
+		indexes = [
+			models.Index(fields=['name']),
+			models.Index(fields=['created_by']),
+			models.Index(fields=['is_public']),
+			models.Index(fields=['created_at']),
+			models.Index(fields=['updated_at']),
+			models.Index(fields=['created_by', 'is_public']),
+		]
+
+	def __str__(self):
+		return f"{self.name} ({self.created_by.username})"
+
+
+class ExerciseProgramItem(models.Model):
+	"""
+	A single exercise entry inside a program.
+	"""
+	program = models.ForeignKey(ExerciseProgram, on_delete=models.CASCADE, related_name='items')
+	exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE, null=True, blank=True, related_name='program_items')
+	custom_exercise = models.ForeignKey(CustomExercise, on_delete=models.CASCADE, null=True, blank=True, related_name='program_items')
+	position = models.PositiveIntegerField(default=1)
+	week = models.PositiveIntegerField(null=True, blank=True)
+	day = models.PositiveIntegerField(null=True, blank=True)
+	sets = models.PositiveIntegerField(null=True, blank=True)
+	reps = models.CharField(max_length=50, blank=True)
+	load = models.CharField(max_length=50, blank=True)
+	rest_seconds = models.PositiveIntegerField(null=True, blank=True)
+	notes = models.TextField(blank=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		ordering = ['position', 'id']
+		constraints = [
+			models.CheckConstraint(
+				condition=(
+					(models.Q(exercise__isnull=False) & models.Q(custom_exercise__isnull=True)) |
+					(models.Q(exercise__isnull=True) & models.Q(custom_exercise__isnull=False))
+				),
+				name='exercise_program_item_single_target'
+			),
+			models.UniqueConstraint(fields=['program', 'position'], name='exercise_program_item_position_unique'),
+		]
+		indexes = [
+			models.Index(fields=['program']),
+			models.Index(fields=['exercise']),
+			models.Index(fields=['custom_exercise']),
+			models.Index(fields=['position']),
+			models.Index(fields=['week']),
+			models.Index(fields=['day']),
+		]
+
+	def __str__(self):
+		target = self.exercise.name if self.exercise_id else self.custom_exercise.name
+		return f"{self.program.name} #{self.position} - {target}"
+
+
 class ExerciseNote(models.Model):
 	"""
 	Per-user notes for either a shared exercise or a custom exercise.
