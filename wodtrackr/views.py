@@ -73,6 +73,20 @@ def exercise_choices(request):
 	}, status=status.HTTP_200_OK)
 
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def exercise_program_choices(request):
+	"""
+	Return available choices for exercise program fields.
+	"""
+	return Response({
+		'category': [{'value': k, 'label': v} for k, v in ExerciseProgram.CATEGORY_CHOICES],
+		'equipment': [{'value': k, 'label': v} for k, v in ExerciseProgram.EQUIPMENT_CHOICES],
+		'primary_muscle_group': [{'value': k, 'label': v} for k, v in ExerciseProgram.Primary_Muscle_Choices],
+		'goal': [{'value': k, 'label': v} for k, v in ExerciseProgram.GOAL_CHOICES],
+	}, status=status.HTTP_200_OK)
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([ExercisePermission])
 def exercises(request):
