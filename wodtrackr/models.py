@@ -129,12 +129,31 @@ class ExerciseProgram(models.Model):
 	"""
 	A reusable exercise program that can be private or shared with other users.
 	"""
+	CATEGORY_CHOICES = Exercise.CATEGORY_CHOICES
+	EQUIPMENT_CHOICES = Exercise.EQUIPMENT_CHOICES
+	Primary_Muscle_Choices = Exercise.Primary_Muscle_Choices
+
+	GOAL_CHOICES = [
+		('strength', 'Strength'),
+		('hypertrophy', 'Hypertrophy'),
+		('endurance', 'Endurance'),
+		('fat_loss', 'Fat Loss'),
+		('mobility', 'Mobility'),
+		('performance', 'Performance'),
+		('general_fitness', 'General Fitness'),
+		('other', 'Other'),
+	]
+
 	created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='exercise_programs')
 	name = models.CharField(
 		max_length=120,
 		validators=[MinLengthValidator(2)]
 	)
 	description = models.TextField(blank=True)
+	category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
+	equipment = models.CharField(max_length=20, choices=EQUIPMENT_CHOICES, default='bodyweight')
+	primary_muscle_group = models.CharField(max_length=50, choices=Primary_Muscle_Choices, blank=True)
+	goal = models.CharField(max_length=20, choices=GOAL_CHOICES, default='other')
 	is_public = models.BooleanField(default=False)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
@@ -147,6 +166,10 @@ class ExerciseProgram(models.Model):
 		]
 		indexes = [
 			models.Index(fields=['name']),
+			models.Index(fields=['category']),
+			models.Index(fields=['equipment']),
+			models.Index(fields=['primary_muscle_group']),
+			models.Index(fields=['goal']),
 			models.Index(fields=['created_by']),
 			models.Index(fields=['is_public']),
 			models.Index(fields=['created_at']),

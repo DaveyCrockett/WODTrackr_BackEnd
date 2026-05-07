@@ -684,12 +684,28 @@ def exercise_programs(request):
 		is_public = request.query_params.get('is_public', '').strip()
 		mine = request.query_params.get('mine', '').strip()
 		created_by = request.query_params.get('created_by', '').strip()
+		category = request.query_params.get('category', '').strip()
+		equipment = request.query_params.get('equipment', '').strip()
+		muscle = request.query_params.get('muscle', '').strip()
+		goal = request.query_params.get('goal', '').strip()
 		exercise_id = request.query_params.get('exercise_id', '').strip()
 		custom_exercise_id = request.query_params.get('custom_exercise_id', '').strip()
 		ordering = request.query_params.get('ordering', '').strip()
 
 		if search:
 			queryset = queryset.filter(Q(name__icontains=search) | Q(description__icontains=search))
+
+		if category:
+			queryset = queryset.filter(category=category)
+
+		if equipment:
+			queryset = queryset.filter(equipment=equipment)
+
+		if muscle:
+			queryset = queryset.filter(primary_muscle_group__icontains=muscle)
+
+		if goal:
+			queryset = queryset.filter(goal=goal)
 
 		if is_public:
 			if is_public.lower() in ['true', 'false']:

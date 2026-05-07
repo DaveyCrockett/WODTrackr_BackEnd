@@ -326,6 +326,18 @@ components:
         description:
           type: string
           nullable: true
+        category:
+          type: string
+          enum: [weightlifting, powerlifting, gymnastics, monostructural, accessory, mobility, other]
+        equipment:
+          type: string
+          enum: [bodyweight, barbell, dumbbell, kettlebell, medicine_ball, box, rig, rings, rope, rower, bike, ski_erg, assault_runner, jump_rope, sled, sandbag, pegboard, other]
+        primary_muscle_group:
+          type: string
+          maxLength: 50
+        goal:
+          type: string
+          enum: [strength, hypertrophy, endurance, fat_loss, mobility, performance, general_fitness, other]
         is_public:
           type: boolean
         created_by:
@@ -361,6 +373,18 @@ components:
           type: string
           nullable: true
           maxLength: 3000
+        category:
+          type: string
+          enum: [weightlifting, powerlifting, gymnastics, monostructural, accessory, mobility, other]
+        equipment:
+          type: string
+          enum: [bodyweight, barbell, dumbbell, kettlebell, medicine_ball, box, rig, rings, rope, rower, bike, ski_erg, assault_runner, jump_rope, sled, sandbag, pegboard, other]
+        primary_muscle_group:
+          type: string
+          maxLength: 50
+        goal:
+          type: string
+          enum: [strength, hypertrophy, endurance, fat_loss, mobility, performance, general_fitness, other]
         is_public:
           type: boolean
         items:
@@ -380,6 +404,18 @@ components:
           type: string
           nullable: true
           maxLength: 3000
+        category:
+          type: string
+          enum: [weightlifting, powerlifting, gymnastics, monostructural, accessory, mobility, other]
+        equipment:
+          type: string
+          enum: [bodyweight, barbell, dumbbell, kettlebell, medicine_ball, box, rig, rings, rope, rower, bike, ski_erg, assault_runner, jump_rope, sled, sandbag, pegboard, other]
+        primary_muscle_group:
+          type: string
+          maxLength: 50
+        goal:
+          type: string
+          enum: [strength, hypertrophy, endurance, fat_loss, mobility, performance, general_fitness, other]
         is_public:
           type: boolean
         items:
@@ -1105,6 +1141,26 @@ paths:
           schema:
             type: integer
           description: Filter by creator user ID (admin only).
+        - in: query
+          name: category
+          schema:
+            type: string
+            enum: [weightlifting, powerlifting, gymnastics, monostructural, accessory, mobility, other]
+        - in: query
+          name: equipment
+          schema:
+            type: string
+            enum: [bodyweight, barbell, dumbbell, kettlebell, medicine_ball, box, rig, rings, rope, rower, bike, ski_erg, assault_runner, jump_rope, sled, sandbag, pegboard, other]
+        - in: query
+          name: muscle
+          schema:
+            type: string
+          description: Filter by primary_muscle_group (contains).
+        - in: query
+          name: goal
+          schema:
+            type: string
+            enum: [strength, hypertrophy, endurance, fat_loss, mobility, performance, general_fitness, other]
         - in: query
           name: exercise_id
           schema:
