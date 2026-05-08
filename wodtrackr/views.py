@@ -84,6 +84,7 @@ def exercise_program_choices(request):
 		'equipment': [{'value': k, 'label': v} for k, v in ExerciseProgram.EQUIPMENT_CHOICES],
 		'primary_muscle_group': [{'value': k, 'label': v} for k, v in ExerciseProgram.Primary_Muscle_Choices],
 		'goal': [{'value': k, 'label': v} for k, v in ExerciseProgram.GOAL_CHOICES],
+		'difficulty': [{'value': k, 'label': v} for k, v in ExerciseProgram.DIFFICULTY_CHOICES],
 	}, status=status.HTTP_200_OK)
 
 
@@ -702,6 +703,7 @@ def exercise_programs(request):
 		equipment = request.query_params.get('equipment', '').strip()
 		muscle = request.query_params.get('muscle', '').strip()
 		goal = request.query_params.get('goal', '').strip()
+		difficulty = request.query_params.get('difficulty', '').strip()
 		exercise_id = request.query_params.get('exercise_id', '').strip()
 		custom_exercise_id = request.query_params.get('custom_exercise_id', '').strip()
 		ordering = request.query_params.get('ordering', '').strip()
@@ -720,6 +722,12 @@ def exercise_programs(request):
 
 		if goal:
 			queryset = queryset.filter(goal=goal)
+
+		if difficulty:
+			error = _validate_choice_param(difficulty, dict(ExerciseProgram.DIFFICULTY_CHOICES).keys(), 'difficulty')
+			if error:
+				return error
+			queryset = queryset.filter(difficulty=difficulty)
 
 		if is_public:
 			if is_public.lower() in ['true', 'false']:
@@ -926,6 +934,11 @@ def exercise_program_reuse(request, program_id):
 			created_by=request.user,
 			name=_build_reused_program_name(request.user, program.name),
 			description=program.description,
+			category=program.category,
+			equipment=program.equipment,
+			primary_muscle_group=program.primary_muscle_group,
+			goal=program.goal,
+			difficulty=program.difficulty,
 			is_public=False,
 		)
 		ExerciseProgramItem.objects.bulk_create([

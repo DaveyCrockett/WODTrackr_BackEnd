@@ -805,6 +805,11 @@ All exercise program endpoints are prefixed with: `/api/wodtrackr/`
 - `search` (string) - Search program name and description
 - `is_public` (boolean)
 - `mine` (boolean) - When true, returns only programs created by the authenticated user
+- `category` (string) - One of: weightlifting, powerlifting, gymnastics, monostructural, accessory, mobility, other
+- `equipment` (string) - One of: bodyweight, barbell, dumbbell, kettlebell, medicine_ball, box, rig, rings, rope, rower, bike, ski_erg, assault_runner, jump_rope, sled, sandbag, pegboard, other
+- `muscle` (string) - Partial match on primary muscle group
+- `goal` (string) - One of: strength, hypertrophy, endurance, fat_loss, mobility, performance, general_fitness, other
+- `difficulty` (string) - One of: beginner, intermediate, advanced, all_levels
 - `exercise_id` (integer) - Filter programs containing a shared exercise
 - `custom_exercise_id` (integer) - Filter programs containing a custom exercise
 - `created_by` (integer) - Filter by creator user ID (admin only)
@@ -818,6 +823,11 @@ All exercise program endpoints are prefixed with: `/api/wodtrackr/`
             "id": 1,
             "name": "Open Prep",
             "description": "Competition prep block.",
+            "category": "weightlifting",
+            "equipment": "barbell",
+            "primary_muscle_group": "legs",
+            "goal": "strength",
+            "difficulty": "intermediate",
             "is_public": true,
             "created_by": 2,
             "created_by_username": "coach",
@@ -858,6 +868,11 @@ All exercise program endpoints are prefixed with: `/api/wodtrackr/`
 {
     "name": "Open Prep",
     "description": "Competition prep block.",
+    "category": "weightlifting",
+    "equipment": "barbell",
+    "primary_muscle_group": "legs",
+    "goal": "strength",
+    "difficulty": "intermediate",
     "is_public": true,
     "items": [
         {
@@ -894,6 +909,11 @@ All exercise program endpoints are prefixed with: `/api/wodtrackr/`
         "id": 1,
         "name": "Open Prep",
         "description": "Competition prep block.",
+        "category": "weightlifting",
+        "equipment": "barbell",
+        "primary_muscle_group": "legs",
+        "goal": "strength",
+        "difficulty": "intermediate",
         "is_public": true,
         "created_by": 2,
         "created_by_username": "coach",
@@ -962,6 +982,11 @@ All exercise program endpoints are prefixed with: `/api/wodtrackr/`
         "id": 7,
         "name": "Open Prep Copy",
         "description": "Competition prep block.",
+        "category": "weightlifting",
+        "equipment": "barbell",
+        "primary_muscle_group": "legs",
+        "goal": "strength",
+        "difficulty": "intermediate",
         "is_public": false,
         "created_by": 3,
         "created_by_username": "athlete",
