@@ -144,6 +144,13 @@ class ExerciseProgram(models.Model):
 		('other', 'Other'),
 	]
 
+	DIFFICULTY_CHOICES = [
+		('beginner', 'Beginner'),
+		('intermediate', 'Intermediate'),
+		('advanced', 'Advanced'),
+		('all_levels', 'All Levels'),
+	]
+
 	created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='exercise_programs')
 	name = models.CharField(
 		max_length=120,
@@ -154,6 +161,7 @@ class ExerciseProgram(models.Model):
 	equipment = models.CharField(max_length=20, choices=EQUIPMENT_CHOICES, default='bodyweight')
 	primary_muscle_group = models.CharField(max_length=50, choices=Primary_Muscle_Choices, blank=True)
 	goal = models.CharField(max_length=20, choices=GOAL_CHOICES, default='other')
+	difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='all_levels')
 	is_public = models.BooleanField(default=False)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
@@ -170,6 +178,7 @@ class ExerciseProgram(models.Model):
 			models.Index(fields=['equipment']),
 			models.Index(fields=['primary_muscle_group']),
 			models.Index(fields=['goal']),
+			models.Index(fields=['difficulty']),
 			models.Index(fields=['created_by']),
 			models.Index(fields=['is_public']),
 			models.Index(fields=['created_at']),
