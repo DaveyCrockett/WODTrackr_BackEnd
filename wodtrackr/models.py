@@ -151,6 +151,21 @@ class ExerciseProgram(models.Model):
 		('all_levels', 'All Levels'),
 	]
 
+	DURATION_WEEKS_CHOICES = [
+		(1, '1'),
+		(2, '2'),
+		(3, '3'),
+		(4, '4'),
+		(5, '5'),
+		(6, '6'),
+		(7, '7'),
+		(8, '8'),
+		(9, '9'),
+		(10, '10'),
+		(11, '11'),
+		(12, '12'),
+	]
+
 	created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='exercise_programs')
 	name = models.CharField(
 		max_length=120,
@@ -162,6 +177,7 @@ class ExerciseProgram(models.Model):
 	primary_muscle_group = models.CharField(max_length=50, choices=Primary_Muscle_Choices, blank=True)
 	goal = models.CharField(max_length=20, choices=GOAL_CHOICES, default='other')
 	difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='all_levels')
+	duration_weeks = models.PositiveSmallIntegerField(choices=DURATION_WEEKS_CHOICES, default=1)
 	is_public = models.BooleanField(default=False)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
@@ -179,6 +195,7 @@ class ExerciseProgram(models.Model):
 			models.Index(fields=['primary_muscle_group']),
 			models.Index(fields=['goal']),
 			models.Index(fields=['difficulty']),
+			models.Index(fields=['duration_weeks']),
 			models.Index(fields=['created_by']),
 			models.Index(fields=['is_public']),
 			models.Index(fields=['created_at']),

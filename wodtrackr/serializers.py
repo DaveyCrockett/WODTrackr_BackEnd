@@ -289,6 +289,7 @@ class ExerciseProgramSerializer(serializers.ModelSerializer):
             'equipment',
             'primary_muscle_group',
             'difficulty',
+            'duration_weeks',
             'is_public',
             'created_by',
             'created_by_username',

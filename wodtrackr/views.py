@@ -85,6 +85,7 @@ def exercise_program_choices(request):
 		'primary_muscle_group': [{'value': k, 'label': v} for k, v in ExerciseProgram.Primary_Muscle_Choices],
 		'goal': [{'value': k, 'label': v} for k, v in ExerciseProgram.GOAL_CHOICES],
 		'difficulty': [{'value': k, 'label': v} for k, v in ExerciseProgram.DIFFICULTY_CHOICES],
+		'duration_weeks': [{'value': k, 'label': v} for k, v in ExerciseProgram.DURATION_WEEKS_CHOICES],
 	}, status=status.HTTP_200_OK)
 
 
@@ -704,6 +705,7 @@ def exercise_programs(request):
 		muscle = request.query_params.get('muscle', '').strip()
 		goal = request.query_params.get('goal', '').strip()
 		difficulty = request.query_params.get('difficulty', '').strip()
+		duration_weeks = request.query_params.get('duration_weeks', '').strip()
 		exercise_id = request.query_params.get('exercise_id', '').strip()
 		custom_exercise_id = request.query_params.get('custom_exercise_id', '').strip()
 		ordering = request.query_params.get('ordering', '').strip()
@@ -728,6 +730,22 @@ def exercise_programs(request):
 			if error:
 				return error
 			queryset = queryset.filter(difficulty=difficulty)
+
+		if duration_weeks:
+			try:
+				duration_weeks_value = int(duration_weeks)
+			except ValueError:
+				return Response(
+					{
+						'error': 'Invalid query parameter',
+						'detail': {'duration_weeks': ['Must be an integer.']}
+					},
+					status=status.HTTP_400_BAD_REQUEST
+				)
+			error = _validate_choice_param(duration_weeks_value, dict(ExerciseProgram.DURATION_WEEKS_CHOICES).keys(), 'duration_weeks')
+			if error:
+				return error
+			queryset = queryset.filter(duration_weeks=duration_weeks_value)
 
 		if is_public:
 			if is_public.lower() in ['true', 'false']:
@@ -939,6 +957,7 @@ def exercise_program_reuse(request, program_id):
 			primary_muscle_group=program.primary_muscle_group,
 			goal=program.goal,
 			difficulty=program.difficulty,
+			duration_weeks=program.duration_weeks,
 			is_public=False,
 		)
 		ExerciseProgramItem.objects.bulk_create([
