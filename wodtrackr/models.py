@@ -148,7 +148,7 @@ class ExerciseProgram(models.Model):
 		('beginner', 'Beginner'),
 		('intermediate', 'Intermediate'),
 		('advanced', 'Advanced'),
-		('all levels', 'All Levels'),
+		('all_levels', 'All Levels'),
 	]
 
 	DURATION_WEEKS_CHOICES = [
