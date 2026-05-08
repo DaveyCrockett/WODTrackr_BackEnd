@@ -176,7 +176,7 @@ class ExerciseProgram(models.Model):
 	equipment = models.CharField(max_length=20, choices=EQUIPMENT_CHOICES, default='bodyweight')
 	primary_muscle_group = models.CharField(max_length=50, choices=Primary_Muscle_Choices, blank=True)
 	goal = models.CharField(max_length=20, choices=GOAL_CHOICES, default='other')
-	difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='all_levels')
+	difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='all levels')
 	duration_weeks = models.PositiveSmallIntegerField(choices=DURATION_WEEKS_CHOICES, default=1)
 	is_public = models.BooleanField(default=False)
 	created_at = models.DateTimeField(auto_now_add=True)
