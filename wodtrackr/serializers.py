@@ -296,5 +296,6 @@ class ExerciseProgramSerializer(serializers.ModelSerializer):
             'items',
             'created_at',
             'updated_at',
+            'goal',
         )
         read_only_fields = ('created_by', 'created_by_username', 'created_at', 'updated_at')
