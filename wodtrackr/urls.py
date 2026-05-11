@@ -10,6 +10,7 @@ from .views import (
     exercise_programs,
     exercise_program_choices,
     exercise_program_detail,
+    exercise_program_item,
     exercise_program_reuse,
 )
 
@@ -24,5 +25,6 @@ urlpatterns = [
     path('exercise-programs/choices/', exercise_program_choices, name='exercise_program_choices'),
     path('exercise-programs/', exercise_programs, name='exercise_programs'),
     path('exercise-programs/<int:program_id>/', exercise_program_detail, name='exercise_program_detail'),
+    path('exercise-programs/<int:program_id>/item/', exercise_program_item, name='exercise_program_item'),
     path('exercise-programs/<int:program_id>/reuse/', exercise_program_reuse, name='exercise_program_reuse'),
 ]

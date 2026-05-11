@@ -9,7 +9,13 @@ from rest_framework.response import Response
 
 from .models import Exercise, CustomExercise, ExerciseNote, ExerciseProgram, ExerciseProgramItem
 from .permissions import ExercisePermission, CustomExercisePermission, ExerciseNotePermission, ExerciseProgramPermission
-from .serializers import ExerciseSerializer, CustomExerciseSerializer, ExerciseNoteSerializer, ExerciseProgramSerializer
+from .serializers import (
+	ExerciseSerializer,
+	CustomExerciseSerializer,
+	ExerciseNoteSerializer,
+	ExerciseProgramSerializer,
+	ExerciseProgramItemSerializer,
+)
 
 
 def _can_manage_exercise(user, exercise):
@@ -926,6 +932,157 @@ def exercise_program_detail(request, program_id):
 
 	program.delete()
 	return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET', 'POST', 'PUT', 'DELETE'])
+@permission_classes([ExerciseProgramPermission])
+def exercise_program_item(request, program_id):
+	"""
+	List, create, update, or delete items for a specific exercise program.
+	"""
+	try:
+		program = ExerciseProgram.objects.select_related('created_by').get(id=program_id)
+	except ExerciseProgram.DoesNotExist:
+		return Response(
+			{
+				'error': 'Exercise program not found'
+			},
+			status=status.HTTP_404_NOT_FOUND
+		)
+
+	if request.method == 'GET':
+		if not _can_view_program(request.user, program):
+			return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+
+		items = program.items.select_related('exercise', 'custom_exercise').order_by('position', 'id')
+		serializer = ExerciseProgramItemSerializer(items, many=True)
+		return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+
+	if not _can_manage_program(request.user, program):
+		return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+
+	if request.method == 'DELETE':
+		item_id = request.query_params.get('id') or request.data.get('id')
+		if not item_id:
+			return Response(
+				{
+					'error': 'Invalid exercise program item data',
+					'detail': {'id': ['This field is required.']}
+				},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+
+		try:
+			item_id_int = int(item_id)
+		except (TypeError, ValueError):
+			return Response(
+				{
+					'error': 'Invalid exercise program item data',
+					'detail': {'id': ['Must be an integer.']}
+				},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+
+		try:
+			item = ExerciseProgramItem.objects.get(id=item_id_int, program=program)
+		except ExerciseProgramItem.DoesNotExist:
+			return Response(
+				{
+					'error': 'Exercise program item not found'
+				},
+				status=status.HTTP_404_NOT_FOUND
+			)
+
+		item.delete()
+		return Response(status=status.HTTP_204_NO_CONTENT)
+
+	if request.method == 'PUT':
+		item_id = request.data.get('id')
+		if not item_id:
+			return Response(
+				{
+					'error': 'Invalid exercise program item data',
+					'detail': {'id': ['This field is required.']}
+				},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+
+		try:
+			item_id_int = int(item_id)
+		except (TypeError, ValueError):
+			return Response(
+				{
+					'error': 'Invalid exercise program item data',
+					'detail': {'id': ['Must be an integer.']}
+				},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+
+		try:
+			item = ExerciseProgramItem.objects.get(id=item_id_int, program=program)
+		except ExerciseProgramItem.DoesNotExist:
+			return Response(
+				{
+					'error': 'Exercise program item not found'
+				},
+				status=status.HTTP_404_NOT_FOUND
+			)
+
+		serializer = ExerciseProgramItemSerializer(item, data=request.data, partial=True, context={'request': request})
+		if serializer.is_valid():
+			try:
+				serializer.save()
+				return Response(
+					{
+						'message': 'Exercise program item updated successfully',
+						'data': serializer.data
+					},
+					status=status.HTTP_200_OK
+				)
+			except IntegrityError:
+				return Response(
+					{
+						'error': 'Invalid exercise program item data',
+						'detail': {'position': ['An item with this position already exists in this program.']}
+					},
+					status=status.HTTP_400_BAD_REQUEST
+				)
+
+		return Response(
+			{
+				'error': 'Invalid exercise program item data',
+				'detail': serializer.errors
+			},
+			status=status.HTTP_400_BAD_REQUEST
+		)
+
+	serializer = ExerciseProgramItemSerializer(data=request.data, context={'request': request})
+	if serializer.is_valid():
+		try:
+			item = serializer.save(program=program)
+			return Response(
+				{
+					'message': 'Exercise program item created successfully',
+					'data': ExerciseProgramItemSerializer(item).data
+				},
+				status=status.HTTP_201_CREATED
+			)
+		except IntegrityError:
+			return Response(
+				{
+					'error': 'Invalid exercise program item data',
+					'detail': {'position': ['An item with this position already exists in this program.']}
+				},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+
+	return Response(
+		{
+			'error': 'Invalid exercise program item data',
+			'detail': serializer.errors
+		},
+		status=status.HTTP_400_BAD_REQUEST
+	)
 
 
 @api_view(['POST'])

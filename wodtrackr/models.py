@@ -132,7 +132,6 @@ class ExerciseProgram(models.Model):
 	CATEGORY_CHOICES = Exercise.CATEGORY_CHOICES
 	EQUIPMENT_CHOICES = Exercise.EQUIPMENT_CHOICES
 	Primary_Muscle_Choices = Exercise.Primary_Muscle_Choices
-
 	GOAL_CHOICES = [
 		('strength', 'Strength'),
 		('hypertrophy', 'Hypertrophy'),
@@ -181,6 +180,7 @@ class ExerciseProgram(models.Model):
 	is_public = models.BooleanField(default=False)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
+
 
 	class Meta:
 		ordering = ['name']
