@@ -125,13 +125,30 @@ class CustomExercise(models.Model):
 		return f"{self.name} ({self.created_by.username})"
 
 
+class Equipment(models.Model):
+	"""
+	Equipment lookup table for ExerciseProgram.
+	"""
+	EQUIPMENT_CHOICES = Exercise.EQUIPMENT_CHOICES
+
+	equipment = models.CharField(max_length=20, choices=EQUIPMENT_CHOICES, default='bodyweight', unique=True)
+	
+
+
+	class Meta:
+		ordering = ['equipment']
+
+	def __str__(self):
+		return self.equipment
+
+
 class ExerciseProgram(models.Model):
 	"""
 	A reusable exercise program that can be private or shared with other users.
 	"""
 	CATEGORY_CHOICES = Exercise.CATEGORY_CHOICES
-	EQUIPMENT_CHOICES = Exercise.EQUIPMENT_CHOICES
 	Primary_Muscle_Choices = Exercise.Primary_Muscle_Choices
+	
 	GOAL_CHOICES = [
 		('strength', 'Strength'),
 		('hypertrophy', 'Hypertrophy'),
@@ -147,7 +164,7 @@ class ExerciseProgram(models.Model):
 		('beginner', 'Beginner'),
 		('intermediate', 'Intermediate'),
 		('advanced', 'Advanced'),
-		('all_levels', 'All Levels'),
+		('all levels', 'All Levels'),
 	]
 
 	DURATION_WEEKS_CHOICES = [
@@ -172,7 +189,7 @@ class ExerciseProgram(models.Model):
 	)
 	description = models.TextField(blank=True)
 	category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
-	equipment = models.CharField(max_length=20, choices=EQUIPMENT_CHOICES, default='bodyweight')
+	equipment = models.ManyToManyField(Equipment, blank=True, related_name='exercise_programs')
 	primary_muscle_group = models.CharField(max_length=50, choices=Primary_Muscle_Choices, blank=True)
 	goal = models.CharField(max_length=20, choices=GOAL_CHOICES, default='other')
 	difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='all levels')
@@ -191,7 +208,6 @@ class ExerciseProgram(models.Model):
 		indexes = [
 			models.Index(fields=['name']),
 			models.Index(fields=['category']),
-			models.Index(fields=['equipment']),
 			models.Index(fields=['primary_muscle_group']),
 			models.Index(fields=['goal']),
 			models.Index(fields=['difficulty']),

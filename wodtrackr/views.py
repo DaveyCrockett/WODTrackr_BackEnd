@@ -7,7 +7,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from .models import Exercise, CustomExercise, ExerciseNote, ExerciseProgram, ExerciseProgramItem
+from .models import Exercise, CustomExercise, ExerciseNote, ExerciseProgram, ExerciseProgramItem, Equipment
 from .permissions import ExercisePermission, CustomExercisePermission, ExerciseNotePermission, ExerciseProgramPermission
 from .serializers import (
 	ExerciseSerializer,
@@ -85,9 +85,17 @@ def exercise_program_choices(request):
 	"""
 	Return available choices for exercise program fields.
 	"""
+	equipment_labels = dict(Exercise.EQUIPMENT_CHOICES)
 	return Response({
 		'category': [{'value': k, 'label': v} for k, v in ExerciseProgram.CATEGORY_CHOICES],
-		'equipment': [{'value': k, 'label': v} for k, v in ExerciseProgram.EQUIPMENT_CHOICES],
+		'equipment': [
+			{
+				'id': equipment.id,
+				'value': equipment.equipment,
+				'label': equipment_labels.get(equipment.equipment, equipment.equipment.replace('_', ' ').title()),
+			}
+			for equipment in Equipment.objects.all().order_by('equipment')
+		],
 		'primary_muscle_group': [{'value': k, 'label': v} for k, v in ExerciseProgram.Primary_Muscle_Choices],
 		'goal': [{'value': k, 'label': v} for k, v in ExerciseProgram.GOAL_CHOICES],
 		'difficulty': [{'value': k, 'label': v} for k, v in ExerciseProgram.DIFFICULTY_CHOICES],
@@ -700,7 +708,7 @@ def exercise_programs(request):
 				Q(is_public=True) | Q(created_by=request.user)
 			)
 
-		queryset = queryset.select_related('created_by').prefetch_related('items__exercise', 'items__custom_exercise')
+		queryset = queryset.select_related('created_by').prefetch_related('equipment', 'items__exercise', 'items__custom_exercise')
 
 		search = request.query_params.get('search', '').strip()
 		is_public = request.query_params.get('is_public', '').strip()
@@ -723,7 +731,10 @@ def exercise_programs(request):
 			queryset = queryset.filter(category=category)
 
 		if equipment:
-			queryset = queryset.filter(equipment=equipment)
+			error = _validate_choice_param(equipment, dict(Exercise.EQUIPMENT_CHOICES).keys(), 'equipment')
+			if error:
+				return error
+			queryset = queryset.filter(equipment__equipment=equipment).distinct()
 
 		if muscle:
 			queryset = queryset.filter(primary_muscle_group__icontains=muscle)

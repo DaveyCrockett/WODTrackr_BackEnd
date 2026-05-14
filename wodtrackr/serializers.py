@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Exercise, CustomExercise, ExerciseNote, ExerciseProgram, ExerciseProgramItem
+from .models import Exercise, CustomExercise, ExerciseNote, ExerciseProgram, ExerciseProgramItem, Equipment
 
 
 class ExerciseSerializer(serializers.ModelSerializer):
@@ -219,6 +219,14 @@ class ExerciseProgramItemSerializer(serializers.ModelSerializer):
 
 class ExerciseProgramSerializer(serializers.ModelSerializer):
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    equipment = serializers.StringRelatedField(many=True, read_only=True)
+    equipment_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Equipment.objects.all(),
+        many=True,
+        write_only=True,
+        required=False,
+        source='equipment'
+    )
     items = ExerciseProgramItemSerializer(many=True, required=False)
 
     def validate_name(self, value):
@@ -287,6 +295,7 @@ class ExerciseProgramSerializer(serializers.ModelSerializer):
             'description',
             'category',
             'equipment',
+            'equipment_ids',
             'primary_muscle_group',
             'difficulty',
             'duration_weeks',
