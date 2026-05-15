@@ -270,16 +270,23 @@ class ExerciseProgramSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
+        equipment_data = validated_data.pop('equipment', [])
         program = ExerciseProgram.objects.create(**validated_data)
+        if equipment_data:
+            program.equipment.set(equipment_data)
         self._create_items(program, items_data)
         return program
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop('items', None)
+        equipment_data = validated_data.pop('equipment', None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
+
+        if equipment_data is not None:
+            instance.equipment.set(equipment_data)
 
         if items_data is not None:
             instance.items.all().delete()
