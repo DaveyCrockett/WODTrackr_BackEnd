@@ -918,10 +918,13 @@ def exercise_program_detail(request, program_id):
 			try:
 				with transaction.atomic():
 					serializer.save()
+				program.refresh_from_db()
+				program = ExerciseProgram.objects.select_related('created_by').prefetch_related('equipment', 'items__exercise', 'items__custom_exercise').get(id=program.id)
+				response_serializer = ExerciseProgramSerializer(program)
 				return Response(
 					{
 						'message': 'Exercise program updated successfully',
-						'data': serializer.data
+						'data': response_serializer.data
 					},
 					status=status.HTTP_200_OK
 				)

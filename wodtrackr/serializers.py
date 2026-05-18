@@ -229,6 +229,19 @@ class ExerciseProgramSerializer(serializers.ModelSerializer):
     )
     items = ExerciseProgramItemSerializer(many=True, required=False)
 
+    def to_internal_value(self, data):
+        # Accept legacy aliases from clients while keeping the canonical API fields.
+        mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
+
+        equipment_value = mutable_data.get('equipment')
+        if 'equipment_ids' not in mutable_data and isinstance(equipment_value, list):
+            mutable_data['equipment_ids'] = equipment_value
+
+        if 'items' not in mutable_data and 'item' in mutable_data:
+            mutable_data['items'] = mutable_data.get('item')
+
+        return super().to_internal_value(mutable_data)
+
     def validate_name(self, value):
         cleaned = value.strip()
         if len(cleaned) < 2:

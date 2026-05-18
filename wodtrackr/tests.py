@@ -690,6 +690,9 @@ class ExerciseProgramAPITest(TestCase):
 			primary_muscle_group='back'
 		)
 
+		self.eq_barbell = Equipment.objects.create(equipment='barbell')
+		self.eq_dumbbell = Equipment.objects.create(equipment='dumbbell')
+
 		self.other_custom_exercise = CustomExercise.objects.create(
 			created_by=self.user2,
 			name='Paused Deadlift',
@@ -789,6 +792,22 @@ class ExerciseProgramAPITest(TestCase):
 		self.assertEqual(response.data['data']['items'][0]['reps'], '1+')
 		self.assertEqual(response.data['data']['items'][0]['load'], '90%')
 		self.assertEqual(response.data['data']['items'][0]['rest_seconds'], 180)
+
+	def test_update_owned_program_accepts_equipment_and_item_aliases(self):
+		self.authenticate(self.user)
+		payload = {
+			'equipment': [self.eq_barbell.id, self.eq_dumbbell.id],
+			'item': [
+				{'exercise': self.public_exercise.id, 'position': 1, 'week': 2, 'day': 4, 'sets': 3, 'reps': '5'}
+			]
+		}
+		response = self.client.put(f'/api/wodtrackr/exercise-programs/{self.owned_program.id}/', payload, format='json')
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data['data']['equipment'], ['barbell', 'dumbbell'])
+		self.assertEqual(len(response.data['data']['items']), 1)
+		self.assertEqual(response.data['data']['items'][0]['exercise'], self.public_exercise.id)
+		self.assertEqual(response.data['data']['items'][0]['week'], 2)
+		self.assertEqual(response.data['data']['items'][0]['day'], 4)
 
 	def test_list_filters_by_exercise_id(self):
 		self.authenticate(self.user)
