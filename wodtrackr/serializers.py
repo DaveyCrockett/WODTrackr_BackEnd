@@ -48,6 +48,24 @@ class ExerciseSerializer(serializers.ModelSerializer):
         read_only_fields = ('created_by', 'created_by_username', 'created_at', 'updated_at')
 
 
+class EquipmentSerializer(serializers.ModelSerializer):
+    value = serializers.CharField(source='equipment', read_only=True)
+    label = serializers.SerializerMethodField()
+
+    def get_label(self, obj):
+        return dict(Equipment.EQUIPMENT_CHOICES).get(obj.equipment, obj.equipment.replace('_', ' ').title())
+
+    class Meta:
+        model = Equipment
+        fields = (
+            'id',
+            'equipment',
+            'value',
+            'label',
+        )
+        read_only_fields = ('id', 'equipment', 'value', 'label')
+
+
 class CustomExerciseSerializer(serializers.ModelSerializer):
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
 

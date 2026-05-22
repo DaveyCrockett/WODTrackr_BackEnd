@@ -11,6 +11,7 @@ from .models import Exercise, CustomExercise, ExerciseNote, ExerciseProgram, Exe
 from .permissions import ExercisePermission, CustomExercisePermission, ExerciseNotePermission, ExerciseProgramPermission
 from .serializers import (
 	ExerciseSerializer,
+	EquipmentSerializer,
 	CustomExerciseSerializer,
 	ExerciseNoteSerializer,
 	ExerciseProgramSerializer,
@@ -101,6 +102,37 @@ def exercise_program_choices(request):
 		'difficulty': [{'value': k, 'label': v} for k, v in ExerciseProgram.DIFFICULTY_CHOICES],
 		'duration_weeks': [{'value': k, 'label': v} for k, v in ExerciseProgram.DURATION_WEEKS_CHOICES],
 	}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def equipment_list(request):
+	"""
+	List all equipment entries.
+	"""
+	queryset = Equipment.objects.all().order_by('equipment')
+	serializer = EquipmentSerializer(queryset, many=True)
+	return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def equipment_detail(request, equipment_id):
+	"""
+	Retrieve a single equipment entry by id.
+	"""
+	try:
+		equipment = Equipment.objects.get(id=equipment_id)
+	except Equipment.DoesNotExist:
+		return Response(
+			{
+				'error': 'Equipment not found'
+			},
+			status=status.HTTP_404_NOT_FOUND
+		)
+
+	serializer = EquipmentSerializer(equipment)
+	return Response({'data': serializer.data}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET', 'POST'])
