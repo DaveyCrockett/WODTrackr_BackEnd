@@ -919,7 +919,7 @@ def exercise_programs(request):
 	)
 
 
-@api_view(['GET', 'PUT', 'DELETE'])
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
 @permission_classes([ExerciseProgramPermission])
 def exercise_program_detail(request, program_id):
 	"""
@@ -944,7 +944,7 @@ def exercise_program_detail(request, program_id):
 	if not _can_manage_program(request.user, program):
 		return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
 
-	if request.method == 'PUT':
+	if request.method in ['PUT', 'PATCH']:
 		serializer = ExerciseProgramSerializer(program, data=request.data, partial=True, context={'request': request})
 		if serializer.is_valid():
 			try:
@@ -1156,13 +1156,13 @@ def exercise_program_reuse(request, program_id):
 			name=_build_reused_program_name(request.user, program.name),
 			description=program.description,
 			category=program.category,
-			equipment=program.equipment,
 			primary_muscle_group=program.primary_muscle_group,
 			goal=program.goal,
 			difficulty=program.difficulty,
 			duration_weeks=program.duration_weeks,
 			is_public=False,
 		)
+		reused_program.equipment.set(program.equipment.all())
 		ExerciseProgramItem.objects.bulk_create([
 			ExerciseProgramItem(
 				program=reused_program,

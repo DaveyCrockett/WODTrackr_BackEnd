@@ -1,12 +1,15 @@
+import tempfile
+
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.models import UserProfile
-from .models import Exercise, CustomExercise, ExerciseNote, ExerciseProgram, ExerciseProgramItem
+from .models import Exercise, CustomExercise, ExerciseNote, ExerciseProgram, ExerciseProgramItem, Equipment
 
 
 class ExerciseAPITest(TestCase):
@@ -690,8 +693,8 @@ class ExerciseProgramAPITest(TestCase):
 			primary_muscle_group='back'
 		)
 
-		self.eq_barbell = Equipment.objects.create(equipment='barbell')
-		self.eq_dumbbell = Equipment.objects.create(equipment='dumbbell')
+		self.eq_barbell, _ = Equipment.objects.get_or_create(equipment='barbell')
+		self.eq_dumbbell, _ = Equipment.objects.get_or_create(equipment='dumbbell')
 
 		self.other_custom_exercise = CustomExercise.objects.create(
 			created_by=self.user2,
@@ -808,6 +811,39 @@ class ExerciseProgramAPITest(TestCase):
 		self.assertEqual(response.data['data']['items'][0]['exercise'], self.public_exercise.id)
 		self.assertEqual(response.data['data']['items'][0]['week'], 2)
 		self.assertEqual(response.data['data']['items'][0]['day'], 4)
+
+	def test_patch_owned_program_partially_updates_without_replacing_items(self):
+		self.authenticate(self.user)
+		payload = {
+			'description': 'Updated description via PATCH'
+		}
+		response = self.client.patch(f'/api/wodtrackr/exercise-programs/{self.owned_program.id}/', payload, format='json')
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data['data']['description'], 'Updated description via PATCH')
+		self.assertEqual(response.data['data']['name'], 'My Pull Cycle')
+		self.assertEqual(len(response.data['data']['items']), 1)
+		self.assertEqual(response.data['data']['items'][0]['custom_exercise'], self.custom_exercise.id)
+
+	def test_patch_owned_program_accepts_program_image(self):
+		self.authenticate(self.user)
+		image_bytes = (
+			b'GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,'
+			b'\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;'
+		)
+		upload = SimpleUploadedFile('program.gif', image_bytes, content_type='image/gif')
+
+		with tempfile.TemporaryDirectory() as temp_media_root:
+			with override_settings(MEDIA_ROOT=temp_media_root):
+				response = self.client.patch(
+					f'/api/wodtrackr/exercise-programs/{self.owned_program.id}/',
+					{'program_image': upload},
+					format='multipart'
+				)
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertIn('exercise_program_images/', response.data['data']['program_image'])
+		self.owned_program.refresh_from_db()
+		self.assertTrue(self.owned_program.program_image.name.startswith('exercise_program_images/'))
 
 	def test_list_filters_by_exercise_id(self):
 		self.authenticate(self.user)

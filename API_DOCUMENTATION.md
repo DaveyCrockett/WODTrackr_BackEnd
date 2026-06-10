@@ -958,6 +958,12 @@ All exercise program endpoints are prefixed with: `/api/wodtrackr/`
 
 **Authentication:** Required (JWT)
 
+**Endpoint:** `PATCH /api/wodtrackr/exercise-programs/{program_id}/`
+
+**Description:** Partially update an exercise program with only the provided fields.
+
+**Authentication:** Required (JWT)
+
 **Endpoint:** `DELETE /api/wodtrackr/exercise-programs/{program_id}/`
 
 **Description:** Delete an exercise program.
