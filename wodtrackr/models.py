@@ -194,7 +194,7 @@ class ExerciseProgram(models.Model):
 	goal = models.CharField(max_length=20, choices=GOAL_CHOICES, default='other')
 	difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='all levels')
 	duration_weeks = models.PositiveSmallIntegerField(choices=DURATION_WEEKS_CHOICES, default=1)
-	program_image = models.ImageField(upload_to='exercise_program_images/', null=True, blank=True)
+	program_image = models.ImageField(upload_to='exercise_program_images/', null=True, blank=True, default='exercise_program_images/Defaultbanner.jpg')
 	is_public = models.BooleanField(default=False)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
