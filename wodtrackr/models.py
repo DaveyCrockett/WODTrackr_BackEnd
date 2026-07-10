@@ -51,7 +51,7 @@ class Exercise(models.Model):
 		('other', 'Other'),
 	]
 
-	name = models.CharField(
+	title = models.CharField(
 		max_length=120,
 		unique=True,
 		validators=[MinLengthValidator(2)]
@@ -66,13 +66,13 @@ class Exercise(models.Model):
 	updated_at = models.DateTimeField(auto_now=True)
 
 	class Meta:
-		ordering = ['name']
+		ordering = ['title']
 		constraints = [
-			models.CheckConstraint(condition=~models.Q(name=''), name='exercise_name_not_blank'),
-			models.UniqueConstraint(Lower('name'), name='exercise_name_unique_ci'),
+			models.CheckConstraint(condition=~models.Q(title=''), title='exercise_name_not_blank'),
+			models.UniqueConstraint(Lower('title'), title='exercise_name_unique_ci'),
 		]
 		indexes = [
-			models.Index(fields=['name']),
+			models.Index(fields=['title']),
 			models.Index(fields=['category']),
 			models.Index(fields=['equipment']),
 			models.Index(fields=['is_public']),
@@ -84,7 +84,7 @@ class Exercise(models.Model):
 		]
 
 	def __str__(self):
-		return self.name
+		return self.title
 
 
 class CustomExercise(models.Model):
@@ -96,7 +96,7 @@ class CustomExercise(models.Model):
 	Primary_Muscle_Choices = Exercise.Primary_Muscle_Choices
 
 	created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='custom_exercises')
-	name = models.CharField(
+	title = models.CharField(
 		max_length=120,
 		validators=[MinLengthValidator(2)]
 	)
@@ -108,13 +108,13 @@ class CustomExercise(models.Model):
 	updated_at = models.DateTimeField(auto_now=True)
 
 	class Meta:
-		ordering = ['name']
+		ordering = ['title']
 		constraints = [
-			models.CheckConstraint(condition=~models.Q(name=''), name='custom_exercise_name_not_blank'),
-			models.UniqueConstraint(Lower('name'), 'created_by', name='custom_exercise_name_unique_ci'),
+			models.CheckConstraint(condition=~models.Q(title=''), title='custom_exercise_title_not_blank'),
+			models.UniqueConstraint(Lower('title'), 'created_by', title='custom_exercise_title_unique_ci'),
 		]
 		indexes = [
-			models.Index(fields=['name']),
+			models.Index(fields=['title']),
 			models.Index(fields=['category']),
 			models.Index(fields=['equipment']),
 			models.Index(fields=['created_by']),
@@ -122,7 +122,7 @@ class CustomExercise(models.Model):
 		]
 
 	def __str__(self):
-		return f"{self.name} ({self.created_by.username})"
+		return f"{self.title} ({self.created_by.username})"
 
 
 class Equipment(models.Model):
@@ -183,7 +183,7 @@ class ExerciseProgram(models.Model):
 	]
 
 	created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='exercise_programs')
-	name = models.CharField(
+	title = models.CharField(
 		max_length=120,
 		validators=[MinLengthValidator(2)]
 	)
@@ -194,20 +194,20 @@ class ExerciseProgram(models.Model):
 	goal = models.CharField(max_length=20, choices=GOAL_CHOICES, default='other')
 	difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='all levels')
 	duration_weeks = models.PositiveSmallIntegerField(choices=DURATION_WEEKS_CHOICES, default=1)
-	program_image = models.ImageField(upload_to='exercise_program_images/', blank=True, default='exercise_program_images/Defaultbanner.jpg')
+	program_image = models.ImageField(upload_to='exercise_program_images/', blank=False, default='exercise_program_images/Defaultbanner.jpg')
 	is_public = models.BooleanField(default=False)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
 
 
 	class Meta:
-		ordering = ['name']
+		ordering = ['title']
 		constraints = [
-			models.CheckConstraint(condition=~models.Q(name=''), name='exercise_program_name_not_blank'),
-			models.UniqueConstraint(Lower('name'), 'created_by', name='exercise_program_name_unique_ci'),
+			models.CheckConstraint(condition=~models.Q(title=''), title='exercise_program_name_not_blank'),
+			models.UniqueConstraint(Lower('title'), 'created_by', title='exercise_program_name_unique_ci'),
 		]
 		indexes = [
-			models.Index(fields=['name']),
+			models.Index(fields=['title']),
 			models.Index(fields=['category']),
 			models.Index(fields=['primary_muscle_group']),
 			models.Index(fields=['goal']),
@@ -221,7 +221,7 @@ class ExerciseProgram(models.Model):
 		]
 
 	def __str__(self):
-		return f"{self.name} ({self.created_by.username})"
+		return f"{self.title} ({self.created_by.username})"
 
 
 class ExerciseProgramItem(models.Model):
@@ -250,9 +250,9 @@ class ExerciseProgramItem(models.Model):
 					(models.Q(exercise__isnull=False) & models.Q(custom_exercise__isnull=True)) |
 					(models.Q(exercise__isnull=True) & models.Q(custom_exercise__isnull=False))
 				),
-				name='exercise_program_item_single_target'
+				title='exercise_program_item_single_target'
 			),
-			models.UniqueConstraint(fields=['program', 'position'], name='exercise_program_item_position_unique'),
+			models.UniqueConstraint(fields=['program', 'position'], title='exercise_program_item_position_unique'),
 		]
 		indexes = [
 			models.Index(fields=['program']),
@@ -264,8 +264,8 @@ class ExerciseProgramItem(models.Model):
 		]
 
 	def __str__(self):
-		target = self.exercise.name if self.exercise_id else self.custom_exercise.name
-		return f"{self.program.name} #{self.position} - {target}"
+		target = self.exercise.title if self.exercise_id else self.custom_exercise.title
+		return f"{self.program.title} #{self.position} - {target}"
 
 
 class ExerciseNote(models.Model):
@@ -287,10 +287,10 @@ class ExerciseNote(models.Model):
 					(models.Q(exercise__isnull=False) & models.Q(custom_exercise__isnull=True)) |
 					(models.Q(exercise__isnull=True) & models.Q(custom_exercise__isnull=False))
 				),
-				name='exercise_note_single_target'
+				title='exercise_note_single_target'
 			),
-			models.UniqueConstraint(fields=['user', 'exercise'], name='unique_note_per_user_exercise'),
-			models.UniqueConstraint(fields=['user', 'custom_exercise'], name='unique_note_per_user_custom_exercise'),
+			models.UniqueConstraint(fields=['user', 'exercise'], title='unique_note_per_user_exercise'),
+			models.UniqueConstraint(fields=['user', 'custom_exercise'], title='unique_note_per_user_custom_exercise'),
 		]
 		indexes = [
 			models.Index(fields=['user']),
@@ -299,5 +299,5 @@ class ExerciseNote(models.Model):
 		]
 
 	def __str__(self):
-		target = self.exercise.name if self.exercise_id else self.custom_exercise.name
+		target = self.exercise.title if self.exercise_id else self.custom_exercise.title
 		return f"Notes: {self.user.username} - {target}"
