@@ -246,7 +246,7 @@ class ExerciseProgramSerializer(serializers.ModelSerializer):
         source='equipment'
     )
     items = ExerciseProgramItemSerializer(many=True, required=False)
-    program_image = serializers.ImageField(required=True, allow_null=True)
+    program_image = serializers.ImageField(required=False)
     def to_internal_value(self, data):
         # Accept legacy aliases from clients while keeping the canonical API fields.
         mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
