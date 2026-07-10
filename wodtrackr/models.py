@@ -68,8 +68,8 @@ class Exercise(models.Model):
 	class Meta:
 		ordering = ['title']
 		constraints = [
-			models.CheckConstraint(condition=~models.Q(title=''), title='exercise_name_not_blank'),
-			models.UniqueConstraint(Lower('title'), title='exercise_name_unique_ci'),
+			models.CheckConstraint(condition=~models.Q(title=''), name='exercise_name_not_blank'),
+			models.UniqueConstraint(Lower('title'), name='exercise_name_unique_ci'),
 		]
 		indexes = [
 			models.Index(fields=['title']),
@@ -110,8 +110,8 @@ class CustomExercise(models.Model):
 	class Meta:
 		ordering = ['title']
 		constraints = [
-			models.CheckConstraint(condition=~models.Q(title=''), title='custom_exercise_title_not_blank'),
-			models.UniqueConstraint(Lower('title'), 'created_by', title='custom_exercise_title_unique_ci'),
+			models.CheckConstraint(condition=~models.Q(title=''), name='custom_exercise_title_not_blank'),
+			models.UniqueConstraint(Lower('title'), 'created_by', name='custom_exercise_title_unique_ci'),
 		]
 		indexes = [
 			models.Index(fields=['title']),
@@ -203,8 +203,8 @@ class ExerciseProgram(models.Model):
 	class Meta:
 		ordering = ['title']
 		constraints = [
-			models.CheckConstraint(condition=~models.Q(title=''), title='exercise_program_name_not_blank'),
-			models.UniqueConstraint(Lower('title'), 'created_by', title='exercise_program_name_unique_ci'),
+			models.CheckConstraint(condition=~models.Q(title=''), name='exercise_program_name_not_blank'),
+			models.UniqueConstraint(Lower('title'), 'created_by', name='exercise_program_name_unique_ci'),
 		]
 		indexes = [
 			models.Index(fields=['title']),
@@ -250,9 +250,9 @@ class ExerciseProgramItem(models.Model):
 					(models.Q(exercise__isnull=False) & models.Q(custom_exercise__isnull=True)) |
 					(models.Q(exercise__isnull=True) & models.Q(custom_exercise__isnull=False))
 				),
-				title='exercise_program_item_single_target'
+				name='exercise_program_item_single_target'
 			),
-			models.UniqueConstraint(fields=['program', 'position'], title='exercise_program_item_position_unique'),
+			models.UniqueConstraint(fields=['program', 'position'], name='exercise_program_item_position_unique'),
 		]
 		indexes = [
 			models.Index(fields=['program']),
@@ -287,10 +287,10 @@ class ExerciseNote(models.Model):
 					(models.Q(exercise__isnull=False) & models.Q(custom_exercise__isnull=True)) |
 					(models.Q(exercise__isnull=True) & models.Q(custom_exercise__isnull=False))
 				),
-				title='exercise_note_single_target'
+				name='exercise_note_single_target'
 			),
-			models.UniqueConstraint(fields=['user', 'exercise'], title='unique_note_per_user_exercise'),
-			models.UniqueConstraint(fields=['user', 'custom_exercise'], title='unique_note_per_user_custom_exercise'),
+			models.UniqueConstraint(fields=['user', 'exercise'], name='unique_note_per_user_exercise'),
+			models.UniqueConstraint(fields=['user', 'custom_exercise'], name='unique_note_per_user_custom_exercise'),
 		]
 		indexes = [
 			models.Index(fields=['user']),
