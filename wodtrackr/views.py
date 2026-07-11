@@ -204,11 +204,11 @@ def exercises(request):
 					status=status.HTTP_400_BAD_REQUEST
 				)
 
-		allowed_ordering = ['name', '-name', 'created_at', '-created_at', 'updated_at', '-updated_at']
+		allowed_ordering = ['title', '-title', 'created_at', '-created_at', 'updated_at', '-updated_at']
 		if ordering in allowed_ordering:
 			queryset = queryset.order_by(ordering)
 		else:
-			queryset = queryset.order_by('name')
+			queryset = queryset.order_by('title')
 
 		serializer = ExerciseSerializer(queryset, many=True)
 		return Response({'data': serializer.data}, status=status.HTTP_200_OK)
@@ -879,11 +879,11 @@ def exercise_programs(request):
 				)
 			queryset = queryset.filter(items__custom_exercise_id=custom_exercise_id_int)
 
-		allowed_ordering = ['name', '-name', 'created_at', '-created_at', 'updated_at', '-updated_at']
+		allowed_ordering = ['title', '-title', 'created_at', '-created_at', 'updated_at', '-updated_at']
 		if ordering in allowed_ordering:
 			queryset = queryset.order_by(ordering)
 		else:
-			queryset = queryset.order_by('name')
+			queryset = queryset.order_by('title')
 
 		queryset = queryset.distinct()
 

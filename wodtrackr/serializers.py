@@ -6,12 +6,12 @@ from .models import Exercise, CustomExercise, ExerciseNote, ExerciseProgram, Exe
 class ExerciseSerializer(serializers.ModelSerializer):
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
 
-    def validate_name(self, value):
+    def validate_title(self, value):
         cleaned = value.strip()
         if len(cleaned) < 2:
-            raise serializers.ValidationError('Name must be at least 2 characters long.')
+            raise serializers.ValidationError('Title must be at least 2 characters long.')
         if len(cleaned) > 120:
-            raise serializers.ValidationError('Name must be 120 characters or fewer.')
+            raise serializers.ValidationError('Title must be 120 characters or fewer.')
         return cleaned
 
     def validate_primary_muscle_group(self, value):
@@ -34,7 +34,7 @@ class ExerciseSerializer(serializers.ModelSerializer):
         model = Exercise
         fields = (
             'id',
-            'name',
+            'title',
             'description',
             'category',
             'equipment',
@@ -112,7 +112,7 @@ class CustomExerciseSerializer(serializers.ModelSerializer):
 
 class ExerciseNoteSerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source='user.username', read_only=True)
-    exercise_name = serializers.CharField(source='exercise.name', read_only=True)
+    exercise_title = serializers.CharField(source='exercise.title', read_only=True)
     custom_exercise_title = serializers.CharField(source='custom_exercise.title', read_only=True)
 
     def validate_notes(self, value):
@@ -150,7 +150,7 @@ class ExerciseNoteSerializer(serializers.ModelSerializer):
             'user',
             'user_username',
             'exercise',
-            'exercise_name',
+            'exercise_title',
             'custom_exercise',
             'custom_exercise_title',
             'notes',
@@ -161,8 +161,8 @@ class ExerciseNoteSerializer(serializers.ModelSerializer):
 
 
 class ExerciseProgramItemSerializer(serializers.ModelSerializer):
-    exercise_name = serializers.CharField(source='exercise.name', read_only=True)
-    custom_exercise_name = serializers.CharField(source='custom_exercise.name', read_only=True)
+    exercise_title = serializers.CharField(source='exercise.title', read_only=True)
+    custom_exercise_title = serializers.CharField(source='custom_exercise.title', read_only=True)
     position = serializers.IntegerField(required=False, min_value=1)
     week = serializers.IntegerField(required=False, allow_null=True, min_value=1)
     day = serializers.IntegerField(required=False, allow_null=True, min_value=1)
@@ -218,9 +218,9 @@ class ExerciseProgramItemSerializer(serializers.ModelSerializer):
         fields = (
             'id',
             'exercise',
-            'exercise_name',
+            'exercise_title',
             'custom_exercise',
-            'custom_exercise_name',
+            'custom_exercise_title',
             'position',
             'week',
             'day',
@@ -329,7 +329,7 @@ class ExerciseProgramSerializer(serializers.ModelSerializer):
         model = ExerciseProgram
         fields = (
             'id',
-            'name',
+            'title',
             'description',
             'category',
             'equipment',
