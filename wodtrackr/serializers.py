@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.conf import settings
 
 from .models import Exercise, CustomExercise, ExerciseNote, ExerciseProgram, ExerciseProgramItem, Equipment
 
@@ -247,6 +248,15 @@ class ExerciseProgramSerializer(serializers.ModelSerializer):
     )
     items = ExerciseProgramItemSerializer(many=True, required=False)
     program_image = serializers.ImageField(required=True)
+
+    def get_image_url(self, obj):
+        if obj.program_image and hasattr(obj.program_image, 'url'):
+            request = self.context.get('request')
+            if request is not None:
+                return request.build_absolute_uri(obj.program_image.url)
+            return  obj.program_image.url
+        return f"{settings.MEDIA_URL}default_program_image.jpg"
+
     def to_internal_value(self, data):
         # Accept legacy aliases from clients while keeping the canonical API fields.
         mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
