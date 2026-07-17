@@ -247,7 +247,7 @@ class ExerciseProgramSerializer(serializers.ModelSerializer):
         source='equipment'
     )
     items = ExerciseProgramItemSerializer(many=True, required=False)
-    program_image = serializers.ImageField(required=True)
+    program_image = serializers.ImageField(required=False, allow_null=False)
 
     def get_image_url(self, obj):
         if obj.program_image and hasattr(obj.program_image, 'url'):
