@@ -11,6 +11,7 @@ from .views import (
     create_guest_session,
     stripe_config,
     create_stripe_checkout_session,
+    create_stripe_billing_portal_session,
     stripe_webhook,
 )
 
@@ -21,6 +22,7 @@ urlpatterns = [
     path('auth/guest/', create_guest_session, name='create_guest_session'),
     path('billing/stripe/config/', stripe_config, name='stripe_config'),
     path('billing/stripe/checkout-session/', create_stripe_checkout_session, name='create_stripe_checkout_session'),
+    path('billing/stripe/portal-session/', create_stripe_billing_portal_session, name='create_stripe_billing_portal_session'),
     path('billing/stripe/webhook/', stripe_webhook, name='stripe_webhook'),
     path('profile/', user_profile, name='user_profile'),
     path('profile/update/', update_profile, name='update_profile'),

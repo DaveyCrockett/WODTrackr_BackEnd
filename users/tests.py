@@ -426,7 +426,10 @@ class AuthFlowAPITest(TestCase):
     STRIPE_WEBHOOK_SECRET='whsec_test_123',
     STRIPE_SUCCESS_URL='http://localhost:5173/billing/success',
     STRIPE_CANCEL_URL='http://localhost:5173/billing/cancel',
+    STRIPE_BILLING_PORTAL_RETURN_URL='http://localhost:5173/billing',
     STRIPE_DEFAULT_PRICE_ID='price_test_123',
+    STRIPE_DEFAULT_PRICE_MONTHLY_INDIVIDUAL_PLUS_ID='price_monthly_plus_123',
+    STRIPE_DEFAULT_PRICE_ANNUAL_INDIVIDUAL_PRO_ID='price_annual_pro_123',
 )
 class StripeBillingAPITest(TestCase):
     def setUp(self):
@@ -446,6 +449,10 @@ class StripeBillingAPITest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['data']['configured'])
         self.assertEqual(response.data['data']['publishable_key'], 'pk_test_123')
+        self.assertEqual(
+            response.data['data']['price_catalog']['monthly_individual_plus'],
+            'price_monthly_plus_123'
+        )
 
     def test_checkout_requires_authentication(self):
         response = self.client.post('/api/users/billing/stripe/checkout-session/', {}, format='json')
@@ -465,7 +472,44 @@ class StripeBillingAPITest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['data']['id'], 'cs_test_123')
         self.assertIn('url', response.data['data'])
+        self.assertEqual(response.data['data']['mode'], 'subscription')
         mock_create.assert_called_once()
+
+    @patch('users.views.stripe.checkout.Session.create')
+    def test_checkout_creates_session_from_plan_key(self, mock_create):
+        self.authenticate()
+        mock_create.return_value = Mock(id='cs_test_plan_123', url='https://checkout.stripe.com/test-plan-session')
+
+        response = self.client.post(
+            '/api/users/billing/stripe/checkout-session/',
+            {'plan_key': 'monthly_individual_plus', 'quantity': 1},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['data']['plan_key'], 'monthly_individual_plus')
+        self.assertEqual(response.data['data']['price_id'], 'price_monthly_plus_123')
+
+    @patch('users.views.stripe.Customer.create')
+    @patch('users.views.stripe.Customer.list')
+    @patch('users.views.stripe.billing_portal.Session.create')
+    def test_portal_session_created(self, mock_portal_create, mock_customer_list, mock_customer_create):
+        self.authenticate()
+        mock_customer_list.return_value = Mock(data=[])
+        mock_customer_create.return_value = Mock(id='cus_test_123')
+        mock_portal_create.return_value = Mock(url='https://billing.stripe.com/session/test')
+
+        response = self.client.post(
+            '/api/users/billing/stripe/portal-session/',
+            {},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['data']['url'], 'https://billing.stripe.com/session/test')
+        mock_portal_create.assert_called_once()
+        _, kwargs = mock_portal_create.call_args
+        self.assertEqual(kwargs['return_url'], 'http://localhost:5173/billing')
 
     @patch('users.views.stripe.Webhook.construct_event')
     def test_webhook_invalid_signature(self, mock_construct_event):

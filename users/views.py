@@ -22,6 +22,18 @@ from .models import GuestSession, LoginAttempt, UserProfile, UserPreference, Rem
 logger = logging.getLogger(__name__)
 
 
+STRIPE_PRICE_SETTING_MAP = {
+    'monthly_free': 'STRIPE_DEFAULT_PRICE_MONTHLY_FREE_ID',
+    'monthly_individual_plus': 'STRIPE_DEFAULT_PRICE_MONTHLY_INDIVIDUAL_PLUS_ID',
+    'monthly_individual_pro': 'STRIPE_DEFAULT_PRICE_MONTHLY_INDIVIDUAL_PRO_ID',
+    'annual_individual_plus': 'STRIPE_DEFAULT_PRICE_ANNUAL_INDIVIDUAL_PLUS_ID',
+    'annual_individual_pro': 'STRIPE_DEFAULT_PRICE_ANNUAL_INDIVIDUAL_PRO_ID',
+    'starter_gym': 'STRIPE_DEFAULT_PRICE_STARTER_GYM_ID',
+    'growth_gym': 'STRIPE_DEFAULT_PRICE_GROWTH_GYM_ID',
+    'pro_gym': 'STRIPE_DEFAULT_PRICE_PRO_GYM_ID',
+}
+
+
 class CustomTokenObtainPairView(TokenObtainPairView):
     """
     Custom JWT token view that logs login attempts for security monitoring.
@@ -119,6 +131,56 @@ def _is_stripe_configured():
     return bool(settings.STRIPE_PUBLISHABLE_KEY and settings.STRIPE_SECRET_KEY)
 
 
+def _stripe_price_catalog():
+    catalog = {}
+    for plan_key, setting_name in STRIPE_PRICE_SETTING_MAP.items():
+        value = getattr(settings, setting_name, '')
+        if value:
+            catalog[plan_key] = value
+    return catalog
+
+
+def _resolve_checkout_price(request_data):
+    # Direct price_id takes precedence to support custom catalog entries from frontend.
+    explicit_price_id = request_data.get('price_id') if isinstance(request_data, dict) else None
+    if explicit_price_id:
+        return explicit_price_id, None
+
+    plan_key = request_data.get('plan_key') if isinstance(request_data, dict) else None
+    if plan_key:
+        catalog = _stripe_price_catalog()
+        return catalog.get(plan_key, ''), plan_key
+
+    return settings.STRIPE_DEFAULT_PRICE_ID, None
+
+
+def _get_or_create_stripe_customer(user):
+    if not user.email:
+        customer = stripe.Customer.create(
+            name=user.username,
+            metadata={
+                'user_id': str(user.id),
+                'username': user.username,
+            },
+        )
+        return customer.id
+
+    existing_customers = stripe.Customer.list(email=user.email, limit=1)
+    existing = existing_customers.data[0] if existing_customers.data else None
+    if existing:
+        return existing.id
+
+    customer = stripe.Customer.create(
+        email=user.email,
+        name=user.username,
+        metadata={
+            'user_id': str(user.id),
+            'username': user.username,
+        },
+    )
+    return customer.id
+
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def stripe_config(request):
@@ -130,6 +192,7 @@ def stripe_config(request):
             'data': {
                 'publishable_key': settings.STRIPE_PUBLISHABLE_KEY,
                 'default_price_id': settings.STRIPE_DEFAULT_PRICE_ID,
+                'price_catalog': _stripe_price_catalog(),
                 'configured': _is_stripe_configured(),
             }
         },
@@ -141,7 +204,7 @@ def stripe_config(request):
 @permission_classes([IsAuthenticated])
 def create_stripe_checkout_session(request):
     """
-    Create a Stripe Checkout Session for a one-time payment.
+    Create a Stripe Checkout Session for subscription or one-time payment.
     """
     if not _is_stripe_configured():
         return Response(
@@ -152,12 +215,22 @@ def create_stripe_checkout_session(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-    price_id = request.data.get('price_id') or settings.STRIPE_DEFAULT_PRICE_ID
+    mode = request.data.get('mode', 'subscription')
+    if mode not in ('subscription', 'payment'):
+        return Response(
+            {
+                'error': 'Invalid checkout mode',
+                'detail': "mode must be either 'subscription' or 'payment'."
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    price_id, plan_key = _resolve_checkout_price(request.data)
     if not price_id:
         return Response(
             {
                 'error': 'Missing price id',
-                'detail': 'Provide price_id in the request or set STRIPE_DEFAULT_PRICE_ID.'
+                'detail': 'Provide price_id, a valid plan_key, or set STRIPE_DEFAULT_PRICE_ID.'
             },
             status=status.HTTP_400_BAD_REQUEST
         )
@@ -185,22 +258,32 @@ def create_stripe_checkout_session(request):
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
     try:
-        checkout_session = stripe.checkout.Session.create(
-            mode='payment',
-            line_items=[
+        checkout_kwargs = {
+            'mode': mode,
+            'line_items': [
                 {
                     'price': price_id,
                     'quantity': quantity,
                 }
             ],
-            success_url=settings.STRIPE_SUCCESS_URL,
-            cancel_url=settings.STRIPE_CANCEL_URL,
-            customer_email=request.user.email or None,
-            metadata={
+            'success_url': settings.STRIPE_SUCCESS_URL,
+            'cancel_url': settings.STRIPE_CANCEL_URL,
+            'metadata': {
                 'user_id': str(request.user.id),
                 'username': request.user.username,
             },
-        )
+        }
+
+        if plan_key:
+            checkout_kwargs['metadata']['plan_key'] = plan_key
+
+        if request.user.email:
+            checkout_kwargs['customer_email'] = request.user.email
+
+        if mode == 'subscription':
+            checkout_kwargs['allow_promotion_codes'] = True
+
+        checkout_session = stripe.checkout.Session.create(**checkout_kwargs)
     except stripe.StripeError as exc:
         return Response(
             {
@@ -216,9 +299,60 @@ def create_stripe_checkout_session(request):
             'data': {
                 'id': checkout_session.id,
                 'url': checkout_session.url,
+                'mode': mode,
+                'price_id': price_id,
+                'plan_key': plan_key,
             },
         },
         status=status.HTTP_201_CREATED
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_stripe_billing_portal_session(request):
+    """
+    Create a Stripe Billing Portal session for subscription management.
+    """
+    if not _is_stripe_configured():
+        return Response(
+            {
+                'error': 'Stripe is not configured',
+                'detail': 'Set STRIPE_PUBLISHABLE_KEY and STRIPE_SECRET_KEY in your environment.'
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    return_url = request.data.get('return_url') or getattr(
+        settings,
+        'STRIPE_BILLING_PORTAL_RETURN_URL',
+        settings.STRIPE_SUCCESS_URL,
+    )
+
+    try:
+        customer_id = _get_or_create_stripe_customer(request.user)
+        portal_session = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=return_url,
+        )
+    except stripe.StripeError as exc:
+        return Response(
+            {
+                'error': 'Stripe billing portal request failed',
+                'detail': str(exc),
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return Response(
+        {
+            'message': 'Billing portal session created',
+            'data': {
+                'url': portal_session.url,
+            }
+        },
+        status=status.HTTP_201_CREATED,
     )
 
 
@@ -254,6 +388,16 @@ def stripe_webhook(request):
     if event_type == 'checkout.session.completed':
         session = event['data']['object']
         logger.info('Stripe checkout completed for session %s', session.get('id'))
+    elif event_type == 'customer.subscription.updated':
+        subscription = event['data']['object']
+        logger.info(
+            'Stripe subscription updated: %s status=%s',
+            subscription.get('id'),
+            subscription.get('status'),
+        )
+    elif event_type == 'customer.subscription.deleted':
+        subscription = event['data']['object']
+        logger.info('Stripe subscription deleted: %s', subscription.get('id'))
     elif event_type == 'payment_intent.payment_failed':
         intent = event['data']['object']
         logger.warning('Stripe payment failed for payment intent %s', intent.get('id'))
