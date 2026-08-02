@@ -1,3 +1,4 @@
+from django.http import JsonResponse, HttpResponse
 from django.urls import path
 from .views import (
     exercises,
@@ -31,4 +32,7 @@ urlpatterns = [
     path('exercise-programs/<int:program_id>/', exercise_program_detail, name='exercise_program_detail'),
     path('exercise-programs/<int:program_id>/item/', exercise_program_item, name='exercise_program_item'),
     path('exercise-programs/<int:program_id>/reuse/', exercise_program_reuse, name='exercise_program_reuse'),
+    path('billing/success/', HttpResponse("Active", content_type="text/plain"), name='billing_success'),
+    path('billing/cancel/', HttpResponse("Cancelled", content_type="text/plain"), name='billing_cancel'),
+    path('billing/', JsonResponse({"status": "ok", "message": "Billing root endpoint"}), name='billing')
 ]
