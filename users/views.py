@@ -1,3 +1,8 @@
+import logging
+
+import stripe
+from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -12,6 +17,9 @@ from django.utils import timezone
 from datetime import timedelta
 from .serializers import RegisterSerializer, UserSerializer, UserProfileSerializer, UserPreferenceSerializer, CustomTokenObtainPairSerializer, GuestSessionSerializer
 from .models import GuestSession, LoginAttempt, UserProfile, UserPreference, RememberMeToken
+
+
+logger = logging.getLogger(__name__)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -105,6 +113,152 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+def _is_stripe_configured():
+    return bool(settings.STRIPE_PUBLISHABLE_KEY and settings.STRIPE_SECRET_KEY)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def stripe_config(request):
+    """
+    Return frontend-safe Stripe configuration.
+    """
+    return Response(
+        {
+            'data': {
+                'publishable_key': settings.STRIPE_PUBLISHABLE_KEY,
+                'default_price_id': settings.STRIPE_DEFAULT_PRICE_ID,
+                'configured': _is_stripe_configured(),
+            }
+        },
+        status=status.HTTP_200_OK
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_stripe_checkout_session(request):
+    """
+    Create a Stripe Checkout Session for a one-time payment.
+    """
+    if not _is_stripe_configured():
+        return Response(
+            {
+                'error': 'Stripe is not configured',
+                'detail': 'Set STRIPE_PUBLISHABLE_KEY and STRIPE_SECRET_KEY in your environment.'
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    price_id = request.data.get('price_id') or settings.STRIPE_DEFAULT_PRICE_ID
+    if not price_id:
+        return Response(
+            {
+                'error': 'Missing price id',
+                'detail': 'Provide price_id in the request or set STRIPE_DEFAULT_PRICE_ID.'
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        quantity = int(request.data.get('quantity', 1))
+    except (TypeError, ValueError):
+        return Response(
+            {
+                'error': 'Invalid quantity',
+                'detail': 'quantity must be a positive integer.'
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if quantity < 1:
+        return Response(
+            {
+                'error': 'Invalid quantity',
+                'detail': 'quantity must be at least 1.'
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            mode='payment',
+            line_items=[
+                {
+                    'price': price_id,
+                    'quantity': quantity,
+                }
+            ],
+            success_url=settings.STRIPE_SUCCESS_URL,
+            cancel_url=settings.STRIPE_CANCEL_URL,
+            customer_email=request.user.email or None,
+            metadata={
+                'user_id': str(request.user.id),
+                'username': request.user.username,
+            },
+        )
+    except stripe.StripeError as exc:
+        return Response(
+            {
+                'error': 'Stripe request failed',
+                'detail': str(exc)
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    return Response(
+        {
+            'message': 'Checkout session created',
+            'data': {
+                'id': checkout_session.id,
+                'url': checkout_session.url,
+            },
+        },
+        status=status.HTTP_201_CREATED
+    )
+
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def stripe_webhook(request):
+    """
+    Handle Stripe webhooks with signature verification.
+    """
+    if not settings.STRIPE_WEBHOOK_SECRET:
+        return Response(
+            {
+                'error': 'Stripe webhook is not configured',
+                'detail': 'Set STRIPE_WEBHOOK_SECRET in your environment.'
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    payload = request.body
+    signature = request.META.get('HTTP_STRIPE_SIGNATURE')
+
+    try:
+        event = stripe.Webhook.construct_event(payload, signature, settings.STRIPE_WEBHOOK_SECRET)
+    except ValueError:
+        return Response({'error': 'Invalid payload'}, status=status.HTTP_400_BAD_REQUEST)
+    except stripe.SignatureVerificationError:
+        return Response({'error': 'Invalid signature'}, status=status.HTTP_400_BAD_REQUEST)
+
+    event_type = event.get('type')
+    if event_type == 'checkout.session.completed':
+        session = event['data']['object']
+        logger.info('Stripe checkout completed for session %s', session.get('id'))
+    elif event_type == 'payment_intent.payment_failed':
+        intent = event['data']['object']
+        logger.warning('Stripe payment failed for payment intent %s', intent.get('id'))
+
+    return Response({'received': True}, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])

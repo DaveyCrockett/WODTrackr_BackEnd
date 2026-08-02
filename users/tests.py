@@ -1,8 +1,10 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
+from django.test.utils import override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
+from unittest.mock import Mock, patch
 from users.models import UserProfile, UserPreference, GuestSession
 from users.serializers import UserSerializer, UserProfileSerializer, UserPreferenceSerializer
 from django.utils import timezone
@@ -416,4 +418,67 @@ class AuthFlowAPITest(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {expired.token}')
         response = self.client.get('/api/users/profile/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+@override_settings(
+    STRIPE_PUBLISHABLE_KEY='pk_test_123',
+    STRIPE_SECRET_KEY='sk_test_123',
+    STRIPE_WEBHOOK_SECRET='whsec_test_123',
+    STRIPE_SUCCESS_URL='http://localhost:5173/billing/success',
+    STRIPE_CANCEL_URL='http://localhost:5173/billing/cancel',
+    STRIPE_DEFAULT_PRICE_ID='price_test_123',
+)
+class StripeBillingAPITest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='stripeuser',
+            email='stripe@example.com',
+            password='password123'
+        )
+
+    def authenticate(self):
+        refresh = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
+
+    def test_stripe_config_public_endpoint(self):
+        response = self.client.get('/api/users/billing/stripe/config/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['data']['configured'])
+        self.assertEqual(response.data['data']['publishable_key'], 'pk_test_123')
+
+    def test_checkout_requires_authentication(self):
+        response = self.client.post('/api/users/billing/stripe/checkout-session/', {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    @patch('users.views.stripe.checkout.Session.create')
+    def test_checkout_creates_session(self, mock_create):
+        self.authenticate()
+        mock_create.return_value = Mock(id='cs_test_123', url='https://checkout.stripe.com/test-session')
+
+        response = self.client.post(
+            '/api/users/billing/stripe/checkout-session/',
+            {'price_id': 'price_test_123', 'quantity': 2},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['data']['id'], 'cs_test_123')
+        self.assertIn('url', response.data['data'])
+        mock_create.assert_called_once()
+
+    @patch('users.views.stripe.Webhook.construct_event')
+    def test_webhook_invalid_signature(self, mock_construct_event):
+        import stripe
+
+        mock_construct_event.side_effect = stripe.SignatureVerificationError('bad sig', 'sig_header')
+
+        response = self.client.post(
+            '/api/users/billing/stripe/webhook/',
+            data='{}',
+            content_type='application/json',
+            HTTP_STRIPE_SIGNATURE='invalid'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
