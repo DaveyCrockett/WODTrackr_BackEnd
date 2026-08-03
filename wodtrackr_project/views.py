@@ -1,8 +1,11 @@
 from pathlib import Path
-
 from django.conf import settings
-from django.http import HttpResponse
+from django.http import JsonResponse, HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+import stripe
 
+# Authenticate the SDK with your secret token
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 def openapi_yaml(request):
     """
@@ -41,3 +44,31 @@ def swagger_ui(request):
 </html>
 """
     return HttpResponse(html, content_type='text/html')
+
+@csrf_exempt
+def create_billing_session(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST request required"}, status=405)
+        
+    try:
+        # Build fully qualified success/cancel paths for the hosted checkout UI
+        domain_url = request.build_absolute_uri("/").rstrip("/")
+        
+        checkpoint = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            mode="subscription",  # Enables ongoing Stripe Billing cycles
+            line_items=[
+                {
+                    "price": "price_1QxXYZ...YourPriceID...",  # From your Product Catalog
+                    "quantity": 1,
+                }
+            ],
+            success_url=f"{domain_url}/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{domain_url}/billing/cancel/",
+        )
+        
+        # Return the secure destination URL directly to your React or HTML client
+        return JsonResponse({"url": checkpoint.url})
+        
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)

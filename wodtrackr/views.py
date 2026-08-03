@@ -1,12 +1,10 @@
 from datetime import datetime
-
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-
 from .models import Exercise, CustomExercise, ExerciseNote, ExerciseProgram, ExerciseProgramItem, Equipment
 from .permissions import ExercisePermission, CustomExercisePermission, ExerciseNotePermission, ExerciseProgramPermission
 from .serializers import (
@@ -1187,3 +1185,8 @@ def exercise_program_reuse(request, program_id):
 		},
 		status=status.HTTP_201_CREATED
 	)
+
+
+
+
+
