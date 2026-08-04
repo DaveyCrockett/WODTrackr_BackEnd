@@ -140,6 +140,24 @@ def _stripe_price_catalog():
     return catalog
 
 
+def _stripe_frontend_settings_payload():
+    return {
+        'publishable_key': settings.STRIPE_PUBLISHABLE_KEY,
+        'default_price_id': settings.STRIPE_DEFAULT_PRICE_ID,
+        'price_catalog': _stripe_price_catalog(),
+        'configured': _is_stripe_configured(),
+        'urls': {
+            'success_url': settings.STRIPE_SUCCESS_URL,
+            'cancel_url': settings.STRIPE_CANCEL_URL,
+            'billing_portal_return_url': getattr(
+                settings,
+                'STRIPE_BILLING_PORTAL_RETURN_URL',
+                settings.STRIPE_SUCCESS_URL,
+            ),
+        },
+    }
+
+
 def _resolve_checkout_price(request_data):
     # Direct price_id takes precedence to support custom catalog entries from frontend.
     explicit_price_id = request_data.get('price_id') if isinstance(request_data, dict) else None
@@ -189,12 +207,21 @@ def stripe_config(request):
     """
     return Response(
         {
-            'data': {
-                'publishable_key': settings.STRIPE_PUBLISHABLE_KEY,
-                'default_price_id': settings.STRIPE_DEFAULT_PRICE_ID,
-                'price_catalog': _stripe_price_catalog(),
-                'configured': _is_stripe_configured(),
-            }
+            'data': _stripe_frontend_settings_payload()
+        },
+        status=status.HTTP_200_OK
+    )
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def stripe_settings(request):
+    """
+    Return Stripe settings used by the frontend, including configured redirect URLs.
+    """
+    return Response(
+        {
+            'data': _stripe_frontend_settings_payload()
         },
         status=status.HTTP_200_OK
     )

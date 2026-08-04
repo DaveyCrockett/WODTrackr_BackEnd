@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include
-from .views import openapi_yaml, swagger_ui, create_billing_session
+from .views import openapi_yaml, swagger_ui
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -26,7 +26,6 @@ urlpatterns = [
     path('api/wodtrackr/', include('wodtrackr.urls')),
     path('api/openapi.yaml', openapi_yaml, name='openapi_yaml'),
     path('api/docs/', swagger_ui, name='swagger_ui'),
-    path('api/billing/create-session/', create_billing_session, name='stripe_session'),
 ]
 
 if settings.DEBUG:

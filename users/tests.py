@@ -449,10 +449,22 @@ class StripeBillingAPITest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['data']['configured'])
         self.assertEqual(response.data['data']['publishable_key'], 'pk_test_123')
+        self.assertEqual(response.data['data']['urls']['success_url'], 'http://localhost:5173/billing/success')
+        self.assertEqual(response.data['data']['urls']['cancel_url'], 'http://localhost:5173/billing/cancel')
+        self.assertEqual(response.data['data']['urls']['billing_portal_return_url'], 'http://localhost:5173/billing')
         self.assertEqual(
             response.data['data']['price_catalog']['monthly_individual_plus'],
             'price_monthly_plus_123'
         )
+
+    def test_stripe_settings_public_endpoint(self):
+        response = self.client.get('/api/users/billing/stripe/settings/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['data']['configured'])
+        self.assertEqual(response.data['data']['publishable_key'], 'pk_test_123')
+        self.assertEqual(response.data['data']['urls']['success_url'], 'http://localhost:5173/billing/success')
+        self.assertEqual(response.data['data']['urls']['cancel_url'], 'http://localhost:5173/billing/cancel')
+        self.assertEqual(response.data['data']['urls']['billing_portal_return_url'], 'http://localhost:5173/billing')
 
     def test_checkout_requires_authentication(self):
         response = self.client.post('/api/users/billing/stripe/checkout-session/', {}, format='json')
