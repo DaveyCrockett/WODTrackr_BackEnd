@@ -1,5 +1,4 @@
 import logging
-
 import stripe
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
