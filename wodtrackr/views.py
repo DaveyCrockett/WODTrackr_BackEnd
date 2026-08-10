@@ -144,8 +144,10 @@ def exercises(request):
 			queryset = Exercise.objects.filter(
 				Q(is_public=True) | Q(created_by=request.user)
 			)
+			all_exercises = Exercise.objects.all()
 		else:
 			queryset = Exercise.objects.filter(is_public=True)
+			all_exercises = Exercise.objects.filter(is_public=True)
 
 		search = request.query_params.get('search', '').strip()
 		category = request.query_params.get('category', '').strip()
@@ -154,10 +156,18 @@ def exercises(request):
 		is_public = request.query_params.get('is_public', '').strip()
 		mine = request.query_params.get('mine', '').strip()
 		ordering = request.query_params.get('ordering', '').strip()
+		exercise_param = request.query_params.get('exercise', '').strip()  # New parameter for filtering by related exercises
+
+		if exercise_param:
+			exercise_names = [
+				e.strip() for e in exercise_param.split(',') if e.strip()
+			]
+			if exercise_names:
+				queryset = queryset.filter(title__in=exercise_names)
 
 		if search:
 			queryset = queryset.filter(
-				Q(name__icontains=search) |
+				Q(title__icontains=search) |
 				Q(description__icontains=search) |
 				Q(primary_muscle_group__icontains=search)
 			)
@@ -208,8 +218,15 @@ def exercises(request):
 		else:
 			queryset = queryset.order_by('title')
 
-		serializer = ExerciseSerializer(queryset, many=True)
-		return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+		filtered_serializer = ExerciseSerializer(queryset, many=True)
+		all_serializer = ExerciseSerializer(all_exercises, many=True)
+		return Response(
+        {
+            'filtered_exercises': filtered_serializer.data,
+            'all_exercises': all_serializer.data,
+        },
+        status=status.HTTP_200_OK,
+    )
 
 	serializer = ExerciseSerializer(data=request.data)
 	if serializer.is_valid():
