@@ -100,6 +100,7 @@ class CustomExercise(models.Model):
 		max_length=120,
 		validators=[MinLengthValidator(2)]
 	)
+	
 	description = models.TextField(blank=True)
 	category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
 	equipment = models.CharField(max_length=20, choices=EQUIPMENT_CHOICES, default='bodyweight')
