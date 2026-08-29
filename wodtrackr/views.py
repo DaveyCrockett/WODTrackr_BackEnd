@@ -5,13 +5,10 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from .models import Exercise, CustomExercise, ExerciseNote, ExerciseProgram, ExerciseProgramItem, Equipment
-from .permissions import ExercisePermission, CustomExercisePermission, ExerciseNotePermission, ExerciseProgramPermission
+from .models import Exercise, ExerciseProgram, ExerciseProgramItem
+from .permissions import ExercisePermission, CustomExercisePermission, ExerciseProgramPermission
 from .serializers import (
 	ExerciseSerializer,
-	EquipmentSerializer,
-	CustomExerciseSerializer,
-	ExerciseNoteSerializer,
 	ExerciseProgramSerializer,
 	ExerciseProgramItemSerializer,
 )
@@ -72,9 +69,11 @@ def exercise_choices(request):
 	Return available choices for exercise fields.
 	"""
 	return Response({
+		'difficulty': [{'value': k, 'label': v} for k, v in Exercise.DIFFICULTY_CHOICES],
 		'category': [{'value': k, 'label': v} for k, v in Exercise.CATEGORY_CHOICES],
 		'equipment': [{'value': k, 'label': v} for k, v in Exercise.EQUIPMENT_CHOICES],
 		'primary_muscle_group': [{'value': k, 'label': v} for k, v in Exercise.Primary_Muscle_Choices],
+		'goal': [{'value': k, 'label': v} for k, v in Exercise.GOAL_CHOICES],
 	}, status=status.HTTP_200_OK)
 
 
@@ -84,53 +83,14 @@ def exercise_program_choices(request):
 	"""
 	Return available choices for exercise program fields.
 	"""
-	equipment_labels = dict(Exercise.EQUIPMENT_CHOICES)
 	return Response({
 		'category': [{'value': k, 'label': v} for k, v in ExerciseProgram.CATEGORY_CHOICES],
-		'equipment': [
-			{
-				'id': equipment.id,
-				'value': equipment.equipment,
-				'label': equipment_labels.get(equipment.equipment, equipment.equipment.replace('_', ' ').title()),
-			}
-			for equipment in Equipment.objects.all().order_by('equipment')
-		],
+		'equipment': [{'value': k, 'label': v} for k, v in ExerciseProgram.EQUIPMENT_CHOICES],
 		'primary_muscle_group': [{'value': k, 'label': v} for k, v in ExerciseProgram.Primary_Muscle_Choices],
 		'goal': [{'value': k, 'label': v} for k, v in ExerciseProgram.GOAL_CHOICES],
 		'difficulty': [{'value': k, 'label': v} for k, v in ExerciseProgram.DIFFICULTY_CHOICES],
 		'duration_weeks': [{'value': k, 'label': v} for k, v in ExerciseProgram.DURATION_WEEKS_CHOICES],
 	}, status=status.HTTP_200_OK)
-
-
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def equipment_list(request):
-	"""
-	List all equipment entries.
-	"""
-	queryset = Equipment.objects.all().order_by('equipment')
-	serializer = EquipmentSerializer(queryset, many=True)
-	return Response({'data': serializer.data}, status=status.HTTP_200_OK)
-
-
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def equipment_detail(request, equipment_id):
-	"""
-	Retrieve a single equipment entry by id.
-	"""
-	try:
-		equipment = Equipment.objects.get(id=equipment_id)
-	except Equipment.DoesNotExist:
-		return Response(
-			{
-				'error': 'Equipment not found'
-			},
-			status=status.HTTP_404_NOT_FOUND
-		)
-
-	serializer = EquipmentSerializer(equipment)
-	return Response({'data': serializer.data}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET', 'POST'])
@@ -227,6 +187,7 @@ def exercises(request):
         },
         status=status.HTTP_200_OK,
     )
+
 
 	serializer = ExerciseSerializer(data=request.data)
 	if serializer.is_valid():
@@ -336,7 +297,7 @@ def custom_exercises(request):
 			queryset = CustomExercise.objects.filter(created_by=request.user)
 
 		queryset = queryset.select_related('created_by')
-
+		difficulty = request.query_params.get('difficulty', '').strip()
 		search = request.query_params.get('search', '').strip()
 		category = request.query_params.get('category', '').strip()
 		equipment = request.query_params.get('equipment', '').strip()
@@ -366,6 +327,11 @@ def custom_exercises(request):
 			queryset = queryset.filter(equipment=equipment)
 		if muscle:
 			queryset = queryset.filter(primary_muscle_group__icontains=muscle)
+		if difficulty:
+			error = _validate_choice_param(difficulty, dict(CustomExercise.DIFFICULTY_CHOICES).keys(), 'difficulty')
+			if error:
+				return error
+			queryset = queryset.filter(difficulty=difficulty)
 		if created_by:
 			if not request.user.is_staff:
 				return Response(
@@ -503,241 +469,6 @@ def custom_exercise_detail(request, custom_exercise_id):
 		)
 
 	custom_exercise.delete()
-	return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-@api_view(['GET', 'POST'])
-@permission_classes([ExerciseNotePermission])
-def exercise_notes(request):
-	"""
-	List exercise notes or create a new note.
-	"""
-	if request.method == 'GET':
-		if request.user.is_staff:
-			queryset = ExerciseNote.objects.all()
-		else:
-			queryset = ExerciseNote.objects.filter(user=request.user)
-
-		queryset = queryset.select_related('user', 'exercise', 'custom_exercise')
-
-		exercise_id = request.query_params.get('exercise_id', '').strip()
-		custom_exercise_id = request.query_params.get('custom_exercise_id', '').strip()
-		ordering = request.query_params.get('ordering', '').strip()
-		search = request.query_params.get('search', '').strip()
-		user_id = request.query_params.get('user_id', '').strip()
-		target = request.query_params.get('target', '').strip()
-		has_notes = request.query_params.get('has_notes', '').strip()
-		created_from = request.query_params.get('created_from', '').strip()
-		created_to = request.query_params.get('created_to', '').strip()
-		updated_from = request.query_params.get('updated_from', '').strip()
-		updated_to = request.query_params.get('updated_to', '').strip()
-
-		if exercise_id and custom_exercise_id:
-			return Response(
-				{
-					'error': 'Invalid query parameter',
-					'detail': {'exercise_id': ['Provide either exercise_id or custom_exercise_id, not both.']}
-				},
-				status=status.HTTP_400_BAD_REQUEST
-			)
-
-		if exercise_id:
-			try:
-				exercise_id_int = int(exercise_id)
-			except ValueError:
-				return Response(
-					{
-						'error': 'Invalid query parameter',
-						'detail': {'exercise_id': ['Must be an integer.']}
-					},
-					status=status.HTTP_400_BAD_REQUEST
-				)
-			queryset = queryset.filter(exercise_id=exercise_id_int)
-		if custom_exercise_id:
-			try:
-				custom_exercise_id_int = int(custom_exercise_id)
-			except ValueError:
-				return Response(
-					{
-						'error': 'Invalid query parameter',
-						'detail': {'custom_exercise_id': ['Must be an integer.']}
-					},
-					status=status.HTTP_400_BAD_REQUEST
-				)
-			queryset = queryset.filter(custom_exercise_id=custom_exercise_id_int)
-
-		if search:
-			queryset = queryset.filter(
-				Q(notes__icontains=search) |
-				Q(exercise__name__icontains=search) |
-				Q(custom_exercise__title__icontains=search)
-			)
-
-		if user_id:
-			if not request.user.is_staff:
-				return Response(
-					{
-						'error': 'Invalid query parameter',
-						'detail': {'user_id': ['Forbidden.']}
-					},
-					status=status.HTTP_403_FORBIDDEN
-				)
-			try:
-				user_id_int = int(user_id)
-			except ValueError:
-				return Response(
-					{
-						'error': 'Invalid query parameter',
-						'detail': {'user_id': ['Must be an integer.']}
-					},
-					status=status.HTTP_400_BAD_REQUEST
-				)
-			queryset = queryset.filter(user_id=user_id_int)
-
-		if target:
-			if target not in ['exercise', 'custom_exercise']:
-				return Response(
-					{
-						'error': 'Invalid query parameter',
-						'detail': {'target': ["Must be 'exercise' or 'custom_exercise'."]}
-					},
-					status=status.HTTP_400_BAD_REQUEST
-				)
-			if target == 'exercise':
-				queryset = queryset.filter(exercise__isnull=False)
-			else:
-				queryset = queryset.filter(custom_exercise__isnull=False)
-
-		if has_notes:
-			if has_notes.lower() not in ['true', 'false']:
-				return Response(
-					{
-						'error': 'Invalid query parameter',
-						'detail': {'has_notes': ['Must be true or false.']}
-					},
-					status=status.HTTP_400_BAD_REQUEST
-				)
-			if has_notes.lower() == 'true':
-				queryset = queryset.exclude(notes='')
-			else:
-				queryset = queryset.filter(notes='')
-
-		created_from_dt = _validate_date_param(created_from, 'created_from')
-		if isinstance(created_from_dt, Response):
-			return created_from_dt
-		if created_from_dt:
-			queryset = queryset.filter(created_at__gte=created_from_dt)
-
-		created_to_dt = _validate_date_param(created_to, 'created_to')
-		if isinstance(created_to_dt, Response):
-			return created_to_dt
-		if created_to_dt:
-			queryset = queryset.filter(created_at__lte=created_to_dt)
-
-		updated_from_dt = _validate_date_param(updated_from, 'updated_from')
-		if isinstance(updated_from_dt, Response):
-			return updated_from_dt
-		if updated_from_dt:
-			queryset = queryset.filter(updated_at__gte=updated_from_dt)
-
-		updated_to_dt = _validate_date_param(updated_to, 'updated_to')
-		if isinstance(updated_to_dt, Response):
-			return updated_to_dt
-		if updated_to_dt:
-			queryset = queryset.filter(updated_at__lte=updated_to_dt)
-
-		allowed_ordering = ['created_at', '-created_at', 'updated_at', '-updated_at']
-		if ordering in allowed_ordering:
-			queryset = queryset.order_by(ordering)
-		else:
-			queryset = queryset.order_by('-updated_at')
-
-		serializer = ExerciseNoteSerializer(queryset, many=True)
-		return Response({'data': serializer.data}, status=status.HTTP_200_OK)
-
-	serializer = ExerciseNoteSerializer(data=request.data, context={'request': request})
-	if serializer.is_valid():
-		try:
-			note = serializer.save(user=request.user)
-			return Response(
-				{
-					'message': 'Exercise note created successfully',
-					'data': ExerciseNoteSerializer(note).data
-				},
-				status=status.HTTP_201_CREATED
-			)
-		except IntegrityError:
-			return Response(
-				{
-					'error': 'Invalid exercise note data',
-					'detail': {'notes': ['A note already exists for this exercise.']}
-				},
-				status=status.HTTP_400_BAD_REQUEST
-			)
-	return Response(
-		{
-			'error': 'Invalid exercise note data',
-			'detail': serializer.errors
-		},
-		status=status.HTTP_400_BAD_REQUEST
-	)
-
-
-@api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([ExerciseNotePermission])
-def exercise_note_detail(request, note_id):
-	"""
-	Retrieve, update, or delete an exercise note.
-	"""
-	try:
-		note = ExerciseNote.objects.get(id=note_id)
-	except ExerciseNote.DoesNotExist:
-		return Response(
-			{
-				'error': 'Exercise note not found'
-			},
-			status=status.HTTP_404_NOT_FOUND
-		)
-
-	if not ExerciseNotePermission().has_object_permission(request, None, note):
-		return Response(
-			{'error': 'Forbidden'},
-			status=status.HTTP_403_FORBIDDEN
-		)
-
-	if request.method == 'GET':
-		serializer = ExerciseNoteSerializer(note)
-		return Response({'data': serializer.data}, status=status.HTTP_200_OK)
-
-	if request.method == 'PUT':
-		serializer = ExerciseNoteSerializer(note, data=request.data, partial=True, context={'request': request})
-		if serializer.is_valid():
-			try:
-				serializer.save()
-				return Response(
-					{
-						'message': 'Exercise note updated successfully',
-						'data': serializer.data
-					},
-					status=status.HTTP_200_OK
-				)
-			except IntegrityError:
-				return Response(
-					{
-						'error': 'Invalid exercise note data',
-						'detail': {'notes': ['A note already exists for this exercise.']}
-					},
-					status=status.HTTP_400_BAD_REQUEST
-				)
-		return Response(
-			{
-				'error': 'Invalid exercise note data',
-				'detail': serializer.errors
-			},
-			status=status.HTTP_400_BAD_REQUEST
-		)
-
-	note.delete()
 	return Response(status=status.HTTP_204_NO_CONTENT)
 
 

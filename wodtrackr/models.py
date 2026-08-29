@@ -51,11 +51,28 @@ class Exercise(models.Model):
 		('other', 'Other'),
 	]
 
+	GOAL_CHOICES = [
+			('strength', 'Strength'),
+			('hypertrophy', 'Hypertrophy'),
+			('endurance', 'Endurance'),
+			('fat_loss', 'Fat Loss'),
+			('mobility', 'Mobility'),
+			('performance', 'Performance'),
+			('general_fitness', 'General Fitness'),
+			('other', 'Other'),
+		]
+	DIFFICULTY_CHOICES = [
+		('beginner', 'Beginner'),
+		('intermediate', 'Intermediate'),
+		('advanced', 'Advanced'),
+	]
+
 	title = models.CharField(
 		max_length=120,
 		unique=True,
 		validators=[MinLengthValidator(2)]
 	)
+	difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='beginner')
 	description = models.TextField(blank=True)
 	category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
 	equipment = models.CharField(max_length=20, choices=EQUIPMENT_CHOICES, default='bodyweight')
@@ -86,80 +103,14 @@ class Exercise(models.Model):
 	def __str__(self):
 		return self.title
 
-
-class CustomExercise(models.Model):
-	"""
-	Represents a user-defined custom exercise.
-	"""
-	CATEGORY_CHOICES = Exercise.CATEGORY_CHOICES
-	EQUIPMENT_CHOICES = Exercise.EQUIPMENT_CHOICES
-	Primary_Muscle_Choices = Exercise.Primary_Muscle_Choices
-
-	created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='custom_exercises')
-	title = models.CharField(
-		max_length=120,
-		validators=[MinLengthValidator(2)]
-	)
-	
-	description = models.TextField(blank=True)
-	category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
-	equipment = models.CharField(max_length=20, choices=EQUIPMENT_CHOICES, default='bodyweight')
-	primary_muscle_group = models.CharField(max_length=50, choices=Primary_Muscle_Choices, blank=True)
-	created_at = models.DateTimeField(auto_now_add=True)
-	updated_at = models.DateTimeField(auto_now=True)
-
-	class Meta:
-		ordering = ['title']
-		constraints = [
-			models.CheckConstraint(condition=~models.Q(title=''), name='custom_exercise_title_not_blank'),
-			models.UniqueConstraint(Lower('title'), 'created_by', name='custom_exercise_title_unique_ci'),
-		]
-		indexes = [
-			models.Index(fields=['title']),
-			models.Index(fields=['category']),
-			models.Index(fields=['equipment']),
-			models.Index(fields=['created_by']),
-			models.Index(fields=['primary_muscle_group']),
-		]
-
-	def __str__(self):
-		return f"{self.title} ({self.created_by.username})"
-
-
-class Equipment(models.Model):
-	"""
-	Equipment lookup table for ExerciseProgram.
-	"""
-	EQUIPMENT_CHOICES = Exercise.EQUIPMENT_CHOICES
-
-	equipment = models.CharField(max_length=20, choices=EQUIPMENT_CHOICES, default='bodyweight', unique=True)
-	
-
-
-	class Meta:
-		ordering = ['equipment']
-
-	def __str__(self):
-		return self.equipment
-
-
 class ExerciseProgram(models.Model):
 	"""
 	A reusable exercise program that can be private or shared with other users.
 	"""
 	CATEGORY_CHOICES = Exercise.CATEGORY_CHOICES
 	Primary_Muscle_Choices = Exercise.Primary_Muscle_Choices
-	
-	GOAL_CHOICES = [
-		('strength', 'Strength'),
-		('hypertrophy', 'Hypertrophy'),
-		('endurance', 'Endurance'),
-		('fat_loss', 'Fat Loss'),
-		('mobility', 'Mobility'),
-		('performance', 'Performance'),
-		('general_fitness', 'General Fitness'),
-		('other', 'Other'),
-	]
+	GOAL_CHOICES = Exercise.GOAL_CHOICES
+	EQUIPMENT_CHOICES = Exercise.EQUIPMENT_CHOICES
 
 	DIFFICULTY_CHOICES = [
 		('beginner', 'Beginner'),
@@ -190,13 +141,14 @@ class ExerciseProgram(models.Model):
 	)
 	description = models.TextField(blank=True)
 	category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
-	equipment = models.ManyToManyField(Equipment, blank=True, related_name='exercise_programs')
+	equipment = models.CharField(max_length=20, choices=EQUIPMENT_CHOICES, blank=True)
 	primary_muscle_group = models.CharField(max_length=50, choices=Primary_Muscle_Choices, blank=True)
 	goal = models.CharField(max_length=20, choices=GOAL_CHOICES, default='other')
 	difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='all levels')
 	duration_weeks = models.PositiveSmallIntegerField(choices=DURATION_WEEKS_CHOICES, default=1)
 	program_image = models.ImageField(upload_to='exercise_program_images/', blank=False)
 	is_public = models.BooleanField(default=False)
+	note = models.TextField(blank=True)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
 
@@ -231,7 +183,6 @@ class ExerciseProgramItem(models.Model):
 	"""
 	program = models.ForeignKey(ExerciseProgram, on_delete=models.CASCADE, related_name='items')
 	exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE, null=True, blank=True, related_name='program_items')
-	custom_exercise = models.ForeignKey(CustomExercise, on_delete=models.CASCADE, null=True, blank=True, related_name='program_items')
 	position = models.PositiveIntegerField(default=1)
 	week = models.PositiveIntegerField(null=True, blank=True)
 	day = models.PositiveIntegerField(null=True, blank=True)
@@ -239,7 +190,6 @@ class ExerciseProgramItem(models.Model):
 	reps = models.CharField(max_length=50, blank=True)
 	load = models.CharField(max_length=50, blank=True)
 	rest_seconds = models.PositiveIntegerField(null=True, blank=True)
-	notes = models.TextField(blank=True)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
 
@@ -248,8 +198,7 @@ class ExerciseProgramItem(models.Model):
 		constraints = [
 			models.CheckConstraint(
 				condition=(
-					(models.Q(exercise__isnull=False) & models.Q(custom_exercise__isnull=True)) |
-					(models.Q(exercise__isnull=True) & models.Q(custom_exercise__isnull=False))
+					(models.Q(exercise__isnull=False))
 				),
 				name='exercise_program_item_single_target'
 			),
@@ -258,7 +207,6 @@ class ExerciseProgramItem(models.Model):
 		indexes = [
 			models.Index(fields=['program']),
 			models.Index(fields=['exercise']),
-			models.Index(fields=['custom_exercise']),
 			models.Index(fields=['position']),
 			models.Index(fields=['week']),
 			models.Index(fields=['day']),
@@ -267,38 +215,3 @@ class ExerciseProgramItem(models.Model):
 	def __str__(self):
 		target = self.exercise.title if self.exercise_id else self.custom_exercise.title
 		return f"{self.program.title} #{self.position} - {target}"
-
-
-class ExerciseNote(models.Model):
-	"""
-	Per-user notes for either a shared exercise or a custom exercise.
-	"""
-	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='exercise_notes')
-	exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE, null=True, blank=True, related_name='notes')
-	custom_exercise = models.ForeignKey(CustomExercise, on_delete=models.CASCADE, null=True, blank=True, related_name='notes')
-	notes = models.TextField(blank=True)
-	created_at = models.DateTimeField(auto_now_add=True)
-	updated_at = models.DateTimeField(auto_now=True)
-
-	class Meta:
-		ordering = ['-updated_at']
-		constraints = [
-			models.CheckConstraint(
-				condition=(
-					(models.Q(exercise__isnull=False) & models.Q(custom_exercise__isnull=True)) |
-					(models.Q(exercise__isnull=True) & models.Q(custom_exercise__isnull=False))
-				),
-				name='exercise_note_single_target'
-			),
-			models.UniqueConstraint(fields=['user', 'exercise'], name='unique_note_per_user_exercise'),
-			models.UniqueConstraint(fields=['user', 'custom_exercise'], name='unique_note_per_user_custom_exercise'),
-		]
-		indexes = [
-			models.Index(fields=['user']),
-			models.Index(fields=['exercise']),
-			models.Index(fields=['custom_exercise']),
-		]
-
-	def __str__(self):
-		target = self.exercise.title if self.exercise_id else self.custom_exercise.title
-		return f"Notes: {self.user.username} - {target}"
