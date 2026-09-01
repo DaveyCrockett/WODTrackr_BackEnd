@@ -8,109 +8,51 @@ class Exercise(models.Model):
 	"""
 	Represents a single exercise definition.
 	"""
-	Primary_Muscle_Choices = [
-		('back', 'Back'),
-		('cardio', 'Cardio'),
-		('chest', 'Chest'),
-		('core', 'Core'),
-		('full_body', 'Full Body'),
-		('glutes', 'Glutes'),
-		('legs', 'Legs'),
-		('shoulders', 'Shoulders'),
-		('other', 'Other'),
-	]
 
-	CATEGORY_CHOICES = [
-		('weightlifting', 'Weightlifting'),
-		('powerlifting', 'Powerlifting'),
-		('gymnastics', 'Gymnastics'),
-		('monostructural', 'Monostructural'),
-		('accessory', 'Accessory'),
-		('mobility', 'Mobility'),
-		('other', 'Other'),
-	]
-
-	EQUIPMENT_CHOICES = [
-		('bodyweight', 'Bodyweight'),
-		('barbell', 'Barbell'),
-		('dumbbell', 'Dumbbell'),
-		('kettlebell', 'Kettlebell'),
-		('medicine_ball', 'Medicine Ball'),
-		('box', 'Plyo Box'),
-		('rig', 'Pull-up Rig'),
-		('rings', 'Rings'),
-		('rope', 'Climbing Rope'),
-		('rower', 'Rower'),
-		('bike', 'Bike'),
-		('ski_erg', 'SkiErg'),
-		('assault_runner', 'Assault Runner'),
-		('jump_rope', 'Jump Rope'),
-		('sled', 'Sled'),
-		('sandbag', 'Sandbag'),
-		('pegboard', 'Pegboard'),
-		('other', 'Other'),
-	]
-
-	GOAL_CHOICES = [
-			('strength', 'Strength'),
-			('hypertrophy', 'Hypertrophy'),
-			('endurance', 'Endurance'),
-			('fat_loss', 'Fat Loss'),
-			('mobility', 'Mobility'),
-			('performance', 'Performance'),
-			('general_fitness', 'General Fitness'),
-			('other', 'Other'),
-		]
 	DIFFICULTY_CHOICES = [
 		('beginner', 'Beginner'),
 		('intermediate', 'Intermediate'),
 		('advanced', 'Advanced'),
 	]
 
-	title = models.CharField(
+	name = models.CharField(
 		max_length=120,
 		unique=True,
 		validators=[MinLengthValidator(2)]
 	)
-	difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='beginner')
-	description = models.TextField(blank=True)
-	category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
-	equipment = models.CharField(max_length=20, choices=EQUIPMENT_CHOICES, default='bodyweight')
-	primary_muscle_group = models.CharField(max_length=50, choices=Primary_Muscle_Choices, blank=True)
+	equipment = models.CharField(max_length=100, blank=True, null=True)
+	target_muscle = models.CharField(max_length=100, blank=True, null=True)
 	created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='exercises')
 	is_public = models.BooleanField(default=True)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
+	instructions = models.JSONField(blank=True, null=True)
+	gif_url = models.URLField(max_length=500, blank=True, null=True)
 
 	class Meta:
-		ordering = ['title']
+		ordering = ['name']
 		constraints = [
-			models.CheckConstraint(condition=~models.Q(title=''), name='exercise_name_not_blank'),
-			models.UniqueConstraint(Lower('title'), name='exercise_name_unique_ci'),
+			models.CheckConstraint(condition=~models.Q(name=''), name='exercise_name_not_blank'),
+			models.UniqueConstraint(Lower('name'), name='exercise_name_unique_ci'),
 		]
 		indexes = [
-			models.Index(fields=['title']),
-			models.Index(fields=['category']),
+			models.Index(fields=['name']),
 			models.Index(fields=['equipment']),
 			models.Index(fields=['is_public']),
 			models.Index(fields=['created_by']),
-			models.Index(fields=['primary_muscle_group']),
+			models.Index(fields=['target_muscle']),
 			models.Index(fields=['created_at']),
 			models.Index(fields=['updated_at']),
 			models.Index(fields=['created_by', 'is_public']),
 		]
 
 	def __str__(self):
-		return self.title
+		return self.name
 
 class ExerciseProgram(models.Model):
 	"""
 	A reusable exercise program that can be private or shared with other users.
 	"""
-	CATEGORY_CHOICES = Exercise.CATEGORY_CHOICES
-	Primary_Muscle_Choices = Exercise.Primary_Muscle_Choices
-	GOAL_CHOICES = Exercise.GOAL_CHOICES
-	EQUIPMENT_CHOICES = Exercise.EQUIPMENT_CHOICES
 
 	DIFFICULTY_CHOICES = [
 		('beginner', 'Beginner'),
@@ -135,15 +77,12 @@ class ExerciseProgram(models.Model):
 	]
 
 	created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='exercise_programs')
-	title = models.CharField(
+	name = models.CharField(
 		max_length=120,
 		validators=[MinLengthValidator(2)]
 	)
 	description = models.TextField(blank=True)
-	category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
-	equipment = models.CharField(max_length=20, choices=EQUIPMENT_CHOICES, blank=True)
-	primary_muscle_group = models.CharField(max_length=50, choices=Primary_Muscle_Choices, blank=True)
-	goal = models.CharField(max_length=20, choices=GOAL_CHOICES, default='other')
+	exercises = models.ManyToManyField(Exercise, verbose_name=("Exercises"))
 	difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='all levels')
 	duration_weeks = models.PositiveSmallIntegerField(choices=DURATION_WEEKS_CHOICES, default=1)
 	program_image = models.ImageField(upload_to='exercise_program_images/', blank=False)
@@ -154,16 +93,13 @@ class ExerciseProgram(models.Model):
 
 
 	class Meta:
-		ordering = ['title']
+		ordering = ['name']
 		constraints = [
-			models.CheckConstraint(condition=~models.Q(title=''), name='exercise_program_name_not_blank'),
-			models.UniqueConstraint(Lower('title'), 'created_by', name='exercise_program_name_unique_ci'),
+			models.CheckConstraint(condition=~models.Q(name=''), name='exercise_program_name_not_blank'),
+			models.UniqueConstraint(Lower('name'), 'created_by', name='exercise_program_name_unique_ci'),
 		]
 		indexes = [
-			models.Index(fields=['title']),
-			models.Index(fields=['category']),
-			models.Index(fields=['primary_muscle_group']),
-			models.Index(fields=['goal']),
+			models.Index(fields=['name']),
 			models.Index(fields=['difficulty']),
 			models.Index(fields=['duration_weeks']),
 			models.Index(fields=['created_by']),
@@ -174,7 +110,7 @@ class ExerciseProgram(models.Model):
 		]
 
 	def __str__(self):
-		return f"{self.title} ({self.created_by.username})"
+		return f"{self.name} ({self.created_by.username})"
 
 
 class ExerciseProgramItem(models.Model):
@@ -213,5 +149,5 @@ class ExerciseProgramItem(models.Model):
 		]
 
 	def __str__(self):
-		target = self.exercise.title if self.exercise_id else self.custom_exercise.title
-		return f"{self.program.title} #{self.position} - {target}"
+		target = self.exercise.name if self.exercise_id else self.custom_exercise.name
+		return f"{self.program.name} #{self.position} - {target}"
