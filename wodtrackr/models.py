@@ -29,7 +29,8 @@ class Exercise(models.Model):
 	target_muscle = models.CharField(max_length=100, blank=True, null=True)
 	instruction_steps = models.JSONField(blank=True, null=True)
 	media_id = models.CharField(max_length=64, blank=True, null=True)
-	image = models.CharField(max_length=500, blank=True, null=True)
+	image_url = models.URLField(max_length=500, blank=True, null=True)
+	image_upload = models.ImageField(upload_to='exercise_dataset/images/', blank=True, null=True)
 	attribution = models.CharField(max_length=255, blank=True, null=True)
 	dataset_created_at = models.DateTimeField(blank=True, null=True)
 	created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='exercises')
@@ -46,6 +47,8 @@ class Exercise(models.Model):
 			models.UniqueConstraint(Lower('name'), name='exercise_name_unique_ci'),
 		]
 		indexes = [
+			models.Index(fields=['image_url']),
+			models.Index(fields=['image_upload']),
 			models.Index(fields=['name']),
 			models.Index(fields=['dataset_id']),
 			models.Index(fields=['category']),

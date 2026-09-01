@@ -10,7 +10,9 @@ class ExerciseSerializer(serializers.ModelSerializer):
     dataset_created_at = serializers.DateTimeField(required=False, allow_null=True)
     title = serializers.CharField(source='name', read_only=True)
     primary_muscle_group = serializers.CharField(source='muscle_group', read_only=True)
-    image_url = serializers.SerializerMethodField(read_only=True)
+    image_url = serializers.URLField(required=False, allow_null=True, allow_blank=True)
+    image_upload = serializers.ImageField(required=False, allow_null=True)
+    resolved_image_url = serializers.SerializerMethodField(read_only=True)
     gif_absolute_url = serializers.SerializerMethodField(read_only=True)
 
     def _build_absolute_url(self, value):
@@ -29,8 +31,21 @@ class ExerciseSerializer(serializers.ModelSerializer):
 
         return request.build_absolute_uri(f'/{value}')
 
-    def get_image_url(self, obj):
-        return self._build_absolute_url(obj.image)
+    def _resolve_image_source(self, obj):
+        image_upload = getattr(obj, 'image_upload', None)
+        if image_upload:
+            if hasattr(image_upload, 'url'):
+                return image_upload.url
+            return image_upload
+
+        image_value = getattr(obj, 'image_url', None)
+        if image_value:
+            return image_value
+
+        return ''
+
+    def get_resolved_image_url(self, obj):
+        return self._build_absolute_url(self._resolve_image_source(obj))
 
     def get_gif_absolute_url(self, obj):
         return self._build_absolute_url(obj.gif_url)
@@ -96,8 +111,9 @@ class ExerciseSerializer(serializers.ModelSerializer):
             'instructions',
             'instruction_steps',
             'media_id',
-            'image',
             'image_url',
+            'image_upload',
+            'resolved_image_url',
             'gif_url',
             'gif_absolute_url',
             'attribution',
