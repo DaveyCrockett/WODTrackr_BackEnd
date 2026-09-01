@@ -20,8 +20,18 @@ class Exercise(models.Model):
 		unique=True,
 		validators=[MinLengthValidator(2)]
 	)
+	dataset_id = models.CharField(max_length=16, blank=True, null=True, unique=True)
+	category = models.CharField(max_length=100, blank=True, null=True)
+	body_part = models.CharField(max_length=100, blank=True, null=True)
 	equipment = models.CharField(max_length=100, blank=True, null=True)
+	muscle_group = models.CharField(max_length=120, blank=True, null=True)
+	secondary_muscles = models.JSONField(default=list, blank=True)
 	target_muscle = models.CharField(max_length=100, blank=True, null=True)
+	instruction_steps = models.JSONField(blank=True, null=True)
+	media_id = models.CharField(max_length=64, blank=True, null=True)
+	image = models.CharField(max_length=500, blank=True, null=True)
+	attribution = models.CharField(max_length=255, blank=True, null=True)
+	dataset_created_at = models.DateTimeField(blank=True, null=True)
 	created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='exercises')
 	is_public = models.BooleanField(default=True)
 	created_at = models.DateTimeField(auto_now_add=True)
@@ -37,7 +47,12 @@ class Exercise(models.Model):
 		]
 		indexes = [
 			models.Index(fields=['name']),
+			models.Index(fields=['dataset_id']),
+			models.Index(fields=['category']),
+			models.Index(fields=['body_part']),
 			models.Index(fields=['equipment']),
+			models.Index(fields=['muscle_group']),
+			models.Index(fields=['media_id']),
 			models.Index(fields=['is_public']),
 			models.Index(fields=['created_by']),
 			models.Index(fields=['target_muscle']),
@@ -149,5 +164,5 @@ class ExerciseProgramItem(models.Model):
 		]
 
 	def __str__(self):
-		target = self.exercise.name if self.exercise_id else self.custom_exercise.name
+		target = self.exercise.name if self.exercise_id else 'Unknown Exercise'
 		return f"{self.program.name} #{self.position} - {target}"

@@ -4,11 +4,11 @@ from django.conf import settings
 from django.db import transaction
 import sys
 
-from wodtrackr.models import Exercise, CustomExercise, ExerciseNote
+from wodtrackr.models import Exercise
 
 
 class Command(BaseCommand):
-    help = "Seed example custom exercises and exercise notes for development/test environments."
+    help = "Seed example Exercise rows aligned with the ExerciseDataset schema."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -39,62 +39,91 @@ class Command(BaseCommand):
             public_exercise, _ = Exercise.objects.get_or_create(
                 name="Back Squat",
                 defaults={
-                    "description": "Classic barbell squat",
-                    "category": "weightlifting",
+                    "dataset_id": "9001",
+                    "category": "upper legs",
+                    "body_part": "upper legs",
                     "equipment": "barbell",
-                    "primary_muscle_group": "legs",
+                    "muscle_group": "quadriceps",
+                    "secondary_muscles": ["glutes", "hamstrings", "core"],
+                    "target_muscle": "quadriceps",
+                    "instructions": {
+                        "en": "Set the bar on your upper back, brace your core, squat until hip crease passes knees, then stand back up.",
+                    },
+                    "instruction_steps": {
+                        "en": [
+                            "Set barbell across upper back and stand tall.",
+                            "Brace core and descend by bending hips and knees.",
+                            "Reach full depth and drive up through the mid-foot.",
+                        ]
+                    },
+                    "media_id": "sampleBackSquat",
+                    "image": "images/sample-backsquat.jpg",
+                    "gif_url": "videos/sample-backsquat.gif",
+                    "attribution": "© Gym visual - https://gymvisual.com/",
                     "created_by": admin_user,
                     "is_public": True,
                 },
             )
 
-            custom_1, _ = CustomExercise.objects.get_or_create(
-                created_by=dev_user,
-                title="Tempo Front Squat",
+            Exercise.objects.get_or_create(
+                name="Ring Row",
                 defaults={
-                    "description": "3s descent, 1s pause at bottom",
-                    "category": "weightlifting",
-                    "equipment": "barbell",
-                    "primary_muscle_group": "legs",
+                    "dataset_id": "9002",
+                    "category": "back",
+                    "body_part": "back",
+                    "equipment": "body weight",
+                    "muscle_group": "lats",
+                    "secondary_muscles": ["rhomboids", "biceps"],
+                    "target_muscle": "lats",
+                    "instructions": {
+                        "en": "Keep your body rigid, pull chest toward rings, then lower with control.",
+                    },
+                    "instruction_steps": {
+                        "en": [
+                            "Grip rings with straight body and heels anchored.",
+                            "Pull elbows back until chest reaches the rings.",
+                            "Lower under control while maintaining a rigid torso.",
+                        ]
+                    },
+                    "media_id": "sampleRingRow",
+                    "image": "images/sample-ringrow.jpg",
+                    "gif_url": "videos/sample-ringrow.gif",
+                    "attribution": "© Gym visual - https://gymvisual.com/",
+                    "created_by": dev_user,
+                    "is_public": True,
                 },
             )
 
-            custom_2, _ = CustomExercise.objects.get_or_create(
-                created_by=admin_user,
-                title="Ring Rows - Pause",
+            Exercise.objects.get_or_create(
+                name="Air Bike Sprint",
                 defaults={
-                    "description": "Pause 2s at top of each rep",
-                    "category": "gymnastics",
-                    "equipment": "rings",
-                    "primary_muscle_group": "back",
+                    "dataset_id": "9003",
+                    "category": "cardio",
+                    "body_part": "cardio",
+                    "equipment": "bike",
+                    "muscle_group": "cardiovascular system",
+                    "secondary_muscles": ["quads", "glutes", "shoulders"],
+                    "target_muscle": "full body",
+                    "instructions": {
+                        "en": "Sprint hard for the interval, breathe rhythmically, and recover at low cadence between efforts.",
+                    },
+                    "instruction_steps": {
+                        "en": [
+                            "Adjust seat and grip for full leg extension.",
+                            "Accelerate to max sustainable cadence.",
+                            "Recover at easy pace before the next sprint.",
+                        ]
+                    },
+                    "media_id": "sampleAirBikeSprint",
+                    "image": "images/sample-airbike.jpg",
+                    "gif_url": "videos/sample-airbike.gif",
+                    "attribution": "© Gym visual - https://gymvisual.com/",
+                    "created_by": admin_user,
+                    "is_public": True,
                 },
             )
 
-            ExerciseNote.objects.get_or_create(
-                user=dev_user,
-                exercise=public_exercise,
-                defaults={
-                    "notes": "Drive through mid-foot and keep chest tall.",
-                },
-            )
-
-            ExerciseNote.objects.get_or_create(
-                user=dev_user,
-                custom_exercise=custom_1,
-                defaults={
-                    "notes": "Use 60% 1RM; focus on tempo control.",
-                },
-            )
-
-            ExerciseNote.objects.get_or_create(
-                user=admin_user,
-                custom_exercise=custom_2,
-                defaults={
-                    "notes": "Keep shoulders packed; pause every rep.",
-                },
-            )
-
-        self.stdout.write(self.style.SUCCESS("Seed data created or already exists."))
+        self.stdout.write(self.style.SUCCESS(f"Seed data created or already exists. Primary record id={public_exercise.id}"))
 
     def _get_or_create_user(self, username, email, password, is_staff=False):
         user, created = User.objects.get_or_create(

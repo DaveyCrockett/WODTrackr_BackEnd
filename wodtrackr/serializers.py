@@ -6,6 +6,27 @@ from .models import Exercise, ExerciseProgram, ExerciseProgramItem
 
 class ExerciseSerializer(serializers.ModelSerializer):
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    target = serializers.CharField(source='target_muscle', required=False, allow_null=True, allow_blank=True)
+    dataset_created_at = serializers.DateTimeField(required=False, allow_null=True)
+    title = serializers.CharField(source='name', read_only=True)
+    primary_muscle_group = serializers.CharField(source='muscle_group', read_only=True)
+
+    def to_internal_value(self, data):
+        mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
+
+        if 'name' not in mutable_data and 'title' in mutable_data:
+            mutable_data['name'] = mutable_data.get('title')
+
+        if 'muscle_group' not in mutable_data and 'primary_muscle_group' in mutable_data:
+            mutable_data['muscle_group'] = mutable_data.get('primary_muscle_group')
+
+        if 'target_muscle' not in mutable_data and 'target' in mutable_data:
+            mutable_data['target_muscle'] = mutable_data.get('target')
+
+        if 'dataset_created_at' not in mutable_data and 'source_created_at' in mutable_data:
+            mutable_data['dataset_created_at'] = mutable_data.get('source_created_at')
+
+        return super().to_internal_value(mutable_data)
 
     def validate_name(self, value):
         cleaned = value.strip()
@@ -15,30 +36,46 @@ class ExerciseSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Name must be 120 characters or fewer.')
         return cleaned
 
-    def validate_primary_muscle_group(self, value):
+    def validate_muscle_group(self, value):
         if value is None:
             return value
         cleaned = value.strip()
-        if len(cleaned) > 50:
-            raise serializers.ValidationError('Primary muscle group must be 50 characters or fewer.')
+        if len(cleaned) > 120:
+            raise serializers.ValidationError('Muscle group must be 120 characters or fewer.')
         return cleaned
 
-    def validate_description(self, value):
+    def validate_secondary_muscles(self, value):
         if value is None:
-            return value
-        cleaned = value.strip()
-        if len(cleaned) > 1000:
-            raise serializers.ValidationError('Description must be 1000 characters or fewer.')
-        return cleaned
+            return []
+        if not isinstance(value, list):
+            raise serializers.ValidationError('Secondary muscles must be a list of strings.')
+        invalid_values = [item for item in value if not isinstance(item, str) or not item.strip()]
+        if invalid_values:
+            raise serializers.ValidationError('Secondary muscles must contain only non-empty strings.')
+        return [item.strip() for item in value]
 
     class Meta:
         model = Exercise
         fields = (
             'id',
+            'dataset_id',
             'name',
-            'description',
+            'title',
+            'category',
+            'body_part',
+            'muscle_group',
+            'primary_muscle_group',
+            'secondary_muscles',
+            'target',
             'target_muscle',
             'equipment',
+            'instructions',
+            'instruction_steps',
+            'media_id',
+            'image',
+            'gif_url',
+            'attribution',
+            'dataset_created_at',
             'is_public',
             'created_by',
             'created_by_username',
@@ -50,7 +87,6 @@ class ExerciseSerializer(serializers.ModelSerializer):
 
 class ExerciseProgramItemSerializer(serializers.ModelSerializer):
     exercise_name = serializers.CharField(source='exercise.name', read_only=True)
-    custom_exercise_name = serializers.CharField(source='custom_exercise.name', read_only=True)
     position = serializers.IntegerField(required=False, min_value=1)
     week = serializers.IntegerField(required=False, allow_null=True, min_value=1)
     day = serializers.IntegerField(required=False, allow_null=True, min_value=1)
@@ -73,27 +109,14 @@ class ExerciseProgramItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Load must be 50 characters or fewer.')
         return cleaned
 
-    def validate_notes(self, value):
-        if value is None:
-            return value
-        cleaned = value.strip()
-        if len(cleaned) > 2000:
-            raise serializers.ValidationError('Notes must be 2000 characters or fewer.')
-        return cleaned
-
     def validate(self, attrs):
         exercise = attrs.get('exercise', getattr(self.instance, 'exercise', None))
-        custom_exercise = attrs.get('custom_exercise', getattr(self.instance, 'custom_exercise', None))
 
-        if (exercise is None and custom_exercise is None) or (exercise is not None and custom_exercise is not None):
-            raise serializers.ValidationError('Provide exactly one of exercise or custom_exercise.')
+        if exercise is None:
+            raise serializers.ValidationError('Exercise is required.')
 
         request = self.context.get('request')
         user = getattr(request, 'user', None)
-
-        if custom_exercise is not None:
-            if not (user and (user.is_staff or custom_exercise.created_by == user)):
-                raise serializers.ValidationError('Custom exercise not found.')
 
         if exercise is not None:
             if not (user and (exercise.is_public or exercise.created_by == user or user.is_staff)):
@@ -107,8 +130,6 @@ class ExerciseProgramItemSerializer(serializers.ModelSerializer):
             'id',
             'exercise',
             'exercise_name',
-            'custom_exercise',
-            'custom_exercise_name',
             'position',
             'week',
             'day',
@@ -116,7 +137,6 @@ class ExerciseProgramItemSerializer(serializers.ModelSerializer):
             'reps',
             'load',
             'rest_seconds',
-            'notes',
             'created_at',
             'updated_at',
         )
@@ -125,32 +145,22 @@ class ExerciseProgramItemSerializer(serializers.ModelSerializer):
 
 class ExerciseProgramSerializer(serializers.ModelSerializer):
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
-    equipment = serializers.StringRelatedField(many=True, read_only=True)
-    equipment_ids = serializers.PrimaryKeyRelatedField(
-        queryset=[choice[0] for choice in ExerciseProgramItem._meta.get_field('exercise').choices],
-        many=True,
-        write_only=True,
-        required=False,
-        source='equipment'
-    )
+    exercises = serializers.PrimaryKeyRelatedField(many=True, queryset=Exercise.objects.all(), required=False)
     items = ExerciseProgramItemSerializer(many=True, required=False)
     program_image = serializers.ImageField(required=False, allow_null=False)
+    image_url = serializers.SerializerMethodField(read_only=True)
 
     def get_image_url(self, obj):
         if obj.program_image and hasattr(obj.program_image, 'url'):
             request = self.context.get('request')
             if request is not None:
                 return request.build_absolute_uri(obj.program_image.url)
-            return  obj.program_image.url
+            return obj.program_image.url
         return f"{settings.MEDIA_URL}default_program_image.jpg"
 
     def to_internal_value(self, data):
         # Accept legacy aliases from clients while keeping the canonical API fields.
         mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
-
-        equipment_value = mutable_data.get('equipment')
-        if 'equipment_ids' not in mutable_data and isinstance(equipment_value, list):
-            mutable_data['equipment_ids'] = equipment_value
 
         if 'items' not in mutable_data and 'item' in mutable_data:
             mutable_data['items'] = mutable_data.get('item')
@@ -196,29 +206,36 @@ class ExerciseProgramSerializer(serializers.ModelSerializer):
         for item_data in self._prepare_items(items_data):
             ExerciseProgramItem.objects.create(program=program, **item_data)
 
+    def _sync_program_exercises_from_items(self, program):
+        exercise_ids = program.items.values_list('exercise_id', flat=True)
+        program.exercises.set(Exercise.objects.filter(id__in=exercise_ids))
+
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
-        equipment_data = validated_data.pop('equipment', [])
+        exercises_data = validated_data.pop('exercises', [])
         program = ExerciseProgram.objects.create(**validated_data)
-        if equipment_data:
-            program.equipment.set(equipment_data)
+        if exercises_data:
+            program.exercises.set(exercises_data)
         self._create_items(program, items_data)
+        if items_data:
+            self._sync_program_exercises_from_items(program)
         return program
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop('items', None)
-        equipment_data = validated_data.pop('equipment', None)
+        exercises_data = validated_data.pop('exercises', None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
-        if equipment_data is not None:
-            instance.equipment.set(equipment_data)
+        if exercises_data is not None:
+            instance.exercises.set(exercises_data)
 
         if items_data is not None:
             instance.items.all().delete()
             self._create_items(instance, items_data)
+            self._sync_program_exercises_from_items(instance)
 
         return instance
 
@@ -232,7 +249,9 @@ class ExerciseProgramSerializer(serializers.ModelSerializer):
             'difficulty',
             'duration_weeks',
             'program_image',
+            'image_url',
             'is_public',
+            'note',
             'created_by',
             'created_by_username',
             'items',
