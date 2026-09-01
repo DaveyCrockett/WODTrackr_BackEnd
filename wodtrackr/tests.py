@@ -41,6 +41,8 @@ class ExerciseApiTests(TestCase):
             equipment='barbell',
             muscle_group='quadriceps',
             target_muscle='quadriceps',
+            image='/media/exercise_dataset/images/0001-2gPfomN.jpg',
+            gif_url='/media/exercise_dataset/videos/0001-2gPfomN.gif',
             is_public=True,
             created_by=self.user,
         )
@@ -100,6 +102,14 @@ class ExerciseApiTests(TestCase):
         self.assertEqual(response.data['data']['name'], 'Handstand Push-up')
         self.assertEqual(response.data['data']['title'], 'Handstand Push-up')
         self.assertEqual(response.data['data']['muscle_group'], 'deltoids')
+
+    def test_detail_includes_absolute_media_urls(self):
+        self._authenticate(self.user)
+        response = self.client.get(f'/api/wodtrackr/exercises/{self.public_exercise.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['data']['image_url'].startswith('http://testserver/media/'))
+        self.assertTrue(response.data['data']['gif_absolute_url'].startswith('http://testserver/media/'))
 
     def test_detail_private_not_owned_forbidden(self):
         self._authenticate(self.user2)

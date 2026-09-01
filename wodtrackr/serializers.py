@@ -10,6 +10,30 @@ class ExerciseSerializer(serializers.ModelSerializer):
     dataset_created_at = serializers.DateTimeField(required=False, allow_null=True)
     title = serializers.CharField(source='name', read_only=True)
     primary_muscle_group = serializers.CharField(source='muscle_group', read_only=True)
+    image_url = serializers.SerializerMethodField(read_only=True)
+    gif_absolute_url = serializers.SerializerMethodField(read_only=True)
+
+    def _build_absolute_url(self, value):
+        if not value:
+            return ''
+
+        if isinstance(value, str) and (value.startswith('http://') or value.startswith('https://')):
+            return value
+
+        request = self.context.get('request')
+        if request is None:
+            return value
+
+        if str(value).startswith('/'):
+            return request.build_absolute_uri(value)
+
+        return request.build_absolute_uri(f'/{value}')
+
+    def get_image_url(self, obj):
+        return self._build_absolute_url(obj.image)
+
+    def get_gif_absolute_url(self, obj):
+        return self._build_absolute_url(obj.gif_url)
 
     def to_internal_value(self, data):
         mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
@@ -73,7 +97,9 @@ class ExerciseSerializer(serializers.ModelSerializer):
             'instruction_steps',
             'media_id',
             'image',
+            'image_url',
             'gif_url',
+            'gif_absolute_url',
             'attribution',
             'dataset_created_at',
             'is_public',

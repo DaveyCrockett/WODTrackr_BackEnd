@@ -153,8 +153,8 @@ def exercises(request):
         else:
             queryset = queryset.order_by('name')
 
-        filtered_serializer = ExerciseSerializer(queryset, many=True)
-        all_serializer = ExerciseSerializer(base_queryset.order_by('name'), many=True)
+        filtered_serializer = ExerciseSerializer(queryset, many=True, context={'request': request})
+        all_serializer = ExerciseSerializer(base_queryset.order_by('name'), many=True, context={'request': request})
         return Response(
             {
                 'data': filtered_serializer.data,
@@ -164,14 +164,14 @@ def exercises(request):
             status=status.HTTP_200_OK,
         )
 
-    serializer = ExerciseSerializer(data=request.data)
+    serializer = ExerciseSerializer(data=request.data, context={'request': request})
     if serializer.is_valid():
         try:
             exercise = serializer.save(created_by=request.user)
             return Response(
                 {
                     'message': 'Exercise created successfully',
-                    'data': ExerciseSerializer(exercise).data,
+                    'data': ExerciseSerializer(exercise, context={'request': request}).data,
                 },
                 status=status.HTTP_201_CREATED,
             )
@@ -210,14 +210,14 @@ def exercise_detail(request, exercise_id):
             can_view = exercise.is_public
         if not can_view:
             return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
-        serializer = ExerciseSerializer(exercise)
+        serializer = ExerciseSerializer(exercise, context={'request': request})
         return Response({'data': serializer.data}, status=status.HTTP_200_OK)
 
     if not _can_manage_exercise(request.user, exercise):
         return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method == 'PUT':
-        serializer = ExerciseSerializer(exercise, data=request.data, partial=True)
+        serializer = ExerciseSerializer(exercise, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             try:
                 serializer.save()
@@ -326,7 +326,7 @@ def exercise_programs(request):
         else:
             queryset = queryset.order_by('name')
 
-        serializer = ExerciseProgramSerializer(queryset.distinct(), many=True)
+        serializer = ExerciseProgramSerializer(queryset.distinct(), many=True, context={'request': request})
         return Response({'data': serializer.data}, status=status.HTTP_200_OK)
 
     serializer = ExerciseProgramSerializer(data=request.data, context={'request': request})
@@ -430,7 +430,7 @@ def exercise_program_item(request, program_id):
             return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
 
         items = program.items.select_related('exercise').order_by('position', 'id')
-        serializer = ExerciseProgramItemSerializer(items, many=True)
+        serializer = ExerciseProgramItemSerializer(items, many=True, context={'request': request})
         return Response({'data': serializer.data}, status=status.HTTP_200_OK)
 
     if not _can_manage_program(request.user, program):
@@ -529,7 +529,7 @@ def exercise_program_item(request, program_id):
             return Response(
                 {
                     'message': 'Exercise program item created successfully',
-                    'data': ExerciseProgramItemSerializer(item).data,
+                    'data': ExerciseProgramItemSerializer(item, context={'request': request}).data,
                 },
                 status=status.HTTP_201_CREATED,
             )
