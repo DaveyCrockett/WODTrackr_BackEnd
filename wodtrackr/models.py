@@ -29,8 +29,8 @@ class Exercise(models.Model):
 	target_muscle = models.CharField(max_length=100, blank=True, null=True)
 	instruction_steps = models.JSONField(blank=True, null=True)
 	media_id = models.CharField(max_length=64, blank=True, null=True)
-	image_url = models.URLField(max_length=500, blank=True, null=True)
-	image_upload = models.ImageField(upload_to='exercise_dataset/images/', blank=True, null=True)
+	image_url = models.URLField(max_length=500, blank=True, null=True, default='exercise_dataset/images/exerciseLink.png')
+	image_upload = models.ImageField(upload_to='exercise_dataset/images/', blank=True, null=True, default='exercise_dataset/images/exerciseLink.png')
 	attribution = models.CharField(max_length=255, blank=True, null=True)
 	dataset_created_at = models.DateTimeField(blank=True, null=True)
 	created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='exercises')
@@ -38,7 +38,7 @@ class Exercise(models.Model):
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
 	instructions = models.JSONField(blank=True, null=True)
-	gif_url = models.URLField(max_length=500, blank=True, null=True)
+	gif_url = models.URLField(max_length=500, blank=True, null=True, default='exercise_dataset/images/exerciseLink.png')
 
 	class Meta:
 		ordering = ['name']
