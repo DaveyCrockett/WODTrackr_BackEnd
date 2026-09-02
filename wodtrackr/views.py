@@ -59,12 +59,22 @@ def exercise_choices(request):
             for value in Exercise.objects.exclude(**{f'{field_name}__isnull': True}).exclude(**{field_name: ''}).values_list(field_name, flat=True).distinct().order_by(field_name)
         ]
 
+    secondary_values = sorted({
+        muscle.strip()
+        for values in Exercise.objects.exclude(secondary_muscles__isnull=True).values_list('secondary_muscles', flat=True)
+        if isinstance(values, list)
+        for muscle in values
+        if isinstance(muscle, str) and muscle.strip()
+    })
+
     return Response(
         {
             'category': distinct_values('category'),
             'body_part': distinct_values('body_part'),
             'equipment': distinct_values('equipment'),
             'muscle_group': distinct_values('muscle_group'),
+            'target_muscle': distinct_values('target_muscle'),
+            'secondary_muscle': [{'value': value, 'label': value.title()} for value in secondary_values],
             'target': distinct_values('target_muscle'),
         },
         status=status.HTTP_200_OK,
@@ -98,15 +108,20 @@ def exercises(request):
         else:
             base_queryset = Exercise.objects.filter(is_public=True)
 
+        base_queryset = base_queryset.select_related('created_by')
+
         queryset = base_queryset
         search = request.query_params.get('search', '').strip()
         category = request.query_params.get('category', '').strip()
         body_part = request.query_params.get('body_part', '').strip()
         equipment = request.query_params.get('equipment', '').strip()
-        muscle = request.query_params.get('muscle', '').strip()
-        target = request.query_params.get('target', '').strip()
+        muscle_group = request.query_params.get('muscle_group', '').strip() or request.query_params.get('muscle', '').strip()
+        target_muscle = request.query_params.get('target_muscle', '').strip() or request.query_params.get('target', '').strip()
+        secondary_muscle = request.query_params.get('secondary_muscle', '').strip()
         is_public = request.query_params.get('is_public', '').strip()
         mine = request.query_params.get('mine', '').strip()
+        has_image = request.query_params.get('has_image', '').strip()
+        image_source = request.query_params.get('image_source', '').strip().lower()
         ordering = request.query_params.get('ordering', '').strip()
 
         if search:
@@ -125,10 +140,12 @@ def exercises(request):
             queryset = queryset.filter(body_part__iexact=body_part)
         if equipment:
             queryset = queryset.filter(equipment__iexact=equipment)
-        if muscle:
-            queryset = queryset.filter(muscle_group__icontains=muscle)
-        if target:
-            queryset = queryset.filter(target_muscle__icontains=target)
+        if muscle_group:
+            queryset = queryset.filter(muscle_group__icontains=muscle_group)
+        if target_muscle:
+            queryset = queryset.filter(target_muscle__icontains=target_muscle)
+        if secondary_muscle:
+            queryset = queryset.filter(secondary_muscles__contains=[secondary_muscle])
 
         parsed_is_public = _parse_bool_query(is_public, 'is_public')
         if isinstance(parsed_is_public, Response):
@@ -146,6 +163,32 @@ def exercises(request):
                 queryset = queryset.none()
         elif parsed_mine is False:
             queryset = queryset.filter(is_public=True)
+
+        has_seeded_image = Q(image_url__isnull=False) & ~Q(image_url='')
+        has_uploaded_image = Q(image_upload__isnull=False) & ~Q(image_upload='')
+        has_any_image = has_seeded_image | has_uploaded_image
+
+        parsed_has_image = _parse_bool_query(has_image, 'has_image')
+        if isinstance(parsed_has_image, Response):
+            return parsed_has_image
+        if parsed_has_image is True:
+            queryset = queryset.filter(has_any_image)
+        elif parsed_has_image is False:
+            queryset = queryset.exclude(has_any_image)
+
+        if image_source:
+            if image_source == 'upload':
+                queryset = queryset.filter(has_uploaded_image)
+            elif image_source == 'seeded':
+                queryset = queryset.filter(has_seeded_image)
+            elif image_source != 'any':
+                return Response(
+                    {
+                        'error': 'Invalid query parameter',
+                        'detail': {'image_source': ['Must be upload, seeded, or any.']},
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         allowed_ordering = ['name', '-name', 'created_at', '-created_at', 'updated_at', '-updated_at']
         if ordering in allowed_ordering:

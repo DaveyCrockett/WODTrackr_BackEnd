@@ -41,6 +41,7 @@ class ExerciseApiTests(TestCase):
             body_part='upper legs',
             equipment='barbell',
             muscle_group='quadriceps',
+            secondary_muscles=['glutes', 'hamstrings'],
             target_muscle='quadriceps',
             image_url='/media/exercise_dataset/images/0001-2gPfomN.jpg',
             gif_url='/media/exercise_dataset/videos/0001-2gPfomN.gif',
@@ -175,6 +176,66 @@ class ExerciseApiTests(TestCase):
         self._authenticate(self.admin)
         response = self.client.delete(f'/api/wodtrackr/exercises/{self.private_exercise.id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_list_filter_has_image_true(self):
+        self._authenticate(self.user)
+        response = self.client.get('/api/wodtrackr/exercises/?has_image=true')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = {item['name'] for item in response.data['data']}
+        self.assertIn('Back Squat', names)
+        self.assertNotIn('Strict Press', names)
+
+    def test_list_filter_image_source_seeded(self):
+        self._authenticate(self.user)
+        response = self.client.get('/api/wodtrackr/exercises/?image_source=seeded')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = {item['name'] for item in response.data['data']}
+        self.assertIn('Back Squat', names)
+        self.assertNotIn('Strict Press', names)
+
+    def test_list_filter_image_source_invalid_returns_400(self):
+        self._authenticate(self.user)
+        response = self.client.get('/api/wodtrackr/exercises/?image_source=broken')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('image_source', response.data['detail'])
+
+    def test_list_filter_muscle_group_param(self):
+        self._authenticate(self.user)
+        response = self.client.get('/api/wodtrackr/exercises/?muscle_group=quadriceps')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = {item['name'] for item in response.data['data']}
+        self.assertIn('Back Squat', names)
+        self.assertNotIn('Strict Press', names)
+
+    def test_list_filter_target_muscle_param(self):
+        self._authenticate(self.user)
+        response = self.client.get('/api/wodtrackr/exercises/?target_muscle=quadriceps')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = {item['name'] for item in response.data['data']}
+        self.assertIn('Back Squat', names)
+        self.assertNotIn('Strict Press', names)
+
+    def test_list_filter_secondary_muscle_param(self):
+        self._authenticate(self.user)
+        response = self.client.get('/api/wodtrackr/exercises/?secondary_muscle=hamstrings')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = {item['name'] for item in response.data['data']}
+        self.assertIn('Back Squat', names)
+        self.assertNotIn('Strict Press', names)
+
+    def test_choices_include_model_native_muscle_keys(self):
+        response = self.client.get('/api/wodtrackr/exercises/choices/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('muscle_group', response.data)
+        self.assertIn('target_muscle', response.data)
+        self.assertIn('secondary_muscle', response.data)
 
 
 class ExerciseProgramApiTests(TestCase):
