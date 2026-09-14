@@ -50,6 +50,8 @@ class Exercise(models.Model):
 		indexes = [
 			models.Index(fields=['image_url']),
 			models.Index(fields=['image_upload']),
+			models.Index(fields=['gif_url']),
+			models.Index(fields=['gif_upload']),
 			models.Index(fields=['name']),
 			models.Index(fields=['dataset_id']),
 			models.Index(fields=['category']),
