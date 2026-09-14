@@ -122,6 +122,36 @@ def exercises(request):
         mine = request.query_params.get('mine', '').strip()
         has_image = request.query_params.get('has_image', '').strip()
         image_source = request.query_params.get('image_source', '').strip().lower()
+        gif_source = request.query_params.get('gif_source', '').strip().lower()
+        has_gif = request.query_params.get('has_gif', '').strip()
+
+        if image_source:
+            if image_source == 'upload':
+                queryset = queryset.filter(has_uploaded_image=True)
+            elif image_source == 'seeded':
+                queryset = queryset.filter(has_seeded_image=True)
+            elif image_source != 'any':
+                return Response(
+                    {
+                        'error': 'Invalid query parameter',
+                        'detail': {'image_source': ['Must be upload, seeded, or any.']},
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        if gif_source:
+            if gif_source == 'upload':
+                queryset = queryset.filter(has_uploaded_gif=True)
+            elif gif_source == 'seeded':
+                queryset = queryset.filter(has_seeded_gif=True)
+            elif gif_source != 'any':
+                return Response(
+                    {
+                        'error': 'Invalid query parameter',
+                        'detail': {'gif_source': ['Must be upload, seeded, or any.']},
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         ordering = request.query_params.get('ordering', '').strip()
 
         if search:
@@ -176,6 +206,19 @@ def exercises(request):
         elif parsed_has_image is False:
             queryset = queryset.exclude(has_any_image)
 
+        
+        has_seeded_gif = Q(gif_url__isnull=False) & ~Q(gif_url='')
+        has_uploaded_gif = Q(gif_upload__isnull=False) & ~Q(gif_upload='')
+        has_any_gif = has_seeded_gif | has_uploaded_gif
+
+        parsed_has_gif = _parse_bool_query(has_gif, 'has_gif')
+        if isinstance(parsed_has_gif, Response):
+            return parsed_has_gif
+        if parsed_has_gif is True:
+            queryset = queryset.filter(has_any_gif)
+        elif parsed_has_gif is False:
+            queryset = queryset.exclude(has_any_gif)
+
         if image_source:
             if image_source == 'upload':
                 queryset = queryset.filter(has_uploaded_image)
@@ -186,6 +229,19 @@ def exercises(request):
                     {
                         'error': 'Invalid query parameter',
                         'detail': {'image_source': ['Must be upload, seeded, or any.']},
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        if gif_source:
+            if gif_source == 'upload':
+                queryset = queryset.filter(has_uploaded_gif)
+            elif gif_source == 'seeded':
+                queryset = queryset.filter(has_seeded_gif)
+            elif gif_source != 'any':
+                return Response(
+                    {
+                        'error': 'Invalid query parameter',
+                        'detail': {'gif_source': ['Must be upload, seeded, or any.']},
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )

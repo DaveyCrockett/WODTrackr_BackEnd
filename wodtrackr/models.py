@@ -31,6 +31,7 @@ class Exercise(models.Model):
 	media_id = models.CharField(max_length=64, blank=True, null=True)
 	image_url = models.URLField(max_length=500, blank=True, null=True, default='exercise_dataset/images/exerciseLink.png')
 	image_upload = models.ImageField(upload_to='exercise_dataset/images/', blank=True, null=True, default='exercise_dataset/images/exerciseLink.png')
+	gif_upload = models.ImageField(upload_to='exercise_dataset/videos/', blank=True, null=True, default='exercise_dataset/videos/1460-IZVHb27.gif')
 	attribution = models.CharField(max_length=255, blank=True, null=True)
 	dataset_created_at = models.DateTimeField(blank=True, null=True)
 	created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='exercises')

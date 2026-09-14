@@ -14,6 +14,8 @@ class ExerciseSerializer(serializers.ModelSerializer):
     image_upload = serializers.ImageField(required=False, allow_null=True)
     resolved_image_url = serializers.SerializerMethodField(read_only=True)
     gif_absolute_url = serializers.SerializerMethodField(read_only=True)
+    gif_url = serializers.URLField(required=False, allow_null=True, allow_blank=True)
+    gif_upload = serializers.ImageField(required=False, allow_null=True)
 
     def _build_absolute_url(self, value):
         if not value:
@@ -123,6 +125,7 @@ class ExerciseSerializer(serializers.ModelSerializer):
             'created_by_username',
             'created_at',
             'updated_at',
+            'gif_upload',
         )
         read_only_fields = ('created_by', 'created_by_username', 'created_at', 'updated_at')
 
