@@ -194,6 +194,7 @@ class ExerciseProgramSerializer(serializers.ModelSerializer):
     items = ExerciseProgramItemSerializer(many=True, required=False)
     program_image = serializers.ImageField(required=False, allow_null=False)
     image_url = serializers.SerializerMethodField(read_only=True)
+    goals = serializers.CharField(required=False)
 
     def get_image_url(self, obj):
         if obj.program_image and hasattr(obj.program_image, 'url'):
@@ -302,6 +303,7 @@ class ExerciseProgramSerializer(serializers.ModelSerializer):
             'items',
             'created_at',
             'updated_at',
+            'goals',
         )
         read_only_fields = ('created_by', 'created_by_username', 'created_at', 'updated_at')
 

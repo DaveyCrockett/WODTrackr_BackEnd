@@ -97,6 +97,14 @@ class ExerciseProgram(models.Model):
 		(12, '12'),
 	]
 
+	GOALS_CHOICES = [
+		('strength', 'Strength'),
+		('hypertrophy', 'Hypertrophy'),
+		('endurance', 'Endurance'),
+		('fat_loss', 'Fat Loss'),
+		('general_fitness', 'General Fitness'),
+	]
+
 	created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='exercise_programs')
 	name = models.CharField(
 		max_length=120,
@@ -105,6 +113,7 @@ class ExerciseProgram(models.Model):
 	description = models.TextField(blank=True)
 	exercises = models.ManyToManyField(Exercise, verbose_name=("Exercises"))
 	difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='all levels')
+	goals = models.CharField(max_length=20, choices=GOALS_CHOICES, default='general_fitness')
 	duration_weeks = models.PositiveSmallIntegerField(choices=DURATION_WEEKS_CHOICES, default=1)
 	program_image = models.ImageField(upload_to='exercise_program_images/', blank=False)
 	is_public = models.BooleanField(default=False)

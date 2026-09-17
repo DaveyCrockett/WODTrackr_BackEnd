@@ -91,6 +91,7 @@ def exercise_program_choices(request):
         {
             'difficulty': [{'value': key, 'label': label} for key, label in ExerciseProgram.DIFFICULTY_CHOICES],
             'duration_weeks': [{'value': key, 'label': label} for key, label in ExerciseProgram.DURATION_WEEKS_CHOICES],
+            'goals': [{'value': key, 'label': label} for key, label in ExerciseProgram.GOALS_CHOICES],
         },
         status=status.HTTP_200_OK,
     )
